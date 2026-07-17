@@ -72,7 +72,7 @@ void setup()
     tft.begin();
     tft.setRotation(3);
 
-    tft.fillScreen(TFT_RED);
+    tft.fillScreen(makeColor(colors::Red));
     const RectangleDimensions keyboardAtBottom{
         0, tft.height() * 2 / 3, tft.width(), tft.height() / 3, 5};
     keyboard.begin(keyboardAtBottom);
@@ -80,7 +80,7 @@ void setup()
     const RectangleDimensions mathsQuizAboveKeyboardInTheMiddle{
         0, tft.height() / 3, tft.width(), tft.height() / 3, 5};
     mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
-    mathsQuiz.draw();
+    mathsQuiz.drawNewQuestion();
 }
 
 void loop()

@@ -81,7 +81,8 @@ struct KeyboardListeners
 };
 
 template<typename... Listeners>
-constexpr KeyboardListeners<Listeners...> makeKeyboardListeners(Listeners... listeners)
+constexpr KeyboardListeners<Listeners...>
+makeKeyboardListeners(Listeners... listeners)
 {
     return KeyboardListeners<Listeners...>{listeners...};
 }
@@ -238,8 +239,18 @@ public:
             selectedCol_ = (selectedCol_ + 1) % Columns;
             break;
         case NavigationEvent::Press:
-            // TODO: Implement
-            break;
+        {
+            int index = selectedRow_ * Columns + selectedCol_;
+            if (index < Labels::size)
+            {
+                char key = labels_.labels[index];
+                for (const auto& listener : listeners_.listeners)
+                {
+                    listener(key);
+                }
+            }
+        }
+        break;
         default:
             break;
         }
@@ -303,7 +314,7 @@ public:
         rect_ = rect;
     }
 
-    void draw()
+    void drawNewQuestion()
     {
         auto currentQuestion  = generateQuestion();
         currentCorrectAnswer_ = currentQuestion.answer;
@@ -312,18 +323,33 @@ public:
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextPadding(rect_.width);
         // Format the question as "operand1 operation operand2 = ?"
-        snprintf(questionsBuffer,
-                 questionsBufferSize,
-                 "%d %c %d = ?",
+        snprintf(questionBuffer_,
+                 questionBufferSize,
+                 "%d %c %d = ",
                  currentQuestion.operand1,
                  currentQuestion.operation,
                  currentQuestion.operand2);
-        tft_.drawString(questionsBuffer,
+        tft_.drawString(questionBuffer_,
                         rect_.x0 + rect_.width / 2,
                         rect_.y0 + rect_.height / 5);
     }
 
-    void handleKeyboardPress(char key) {}
+    void handleKeyboardPress(char key)
+    {
+        size_t currentLength = strlen(questionBuffer_);
+        if (currentLength < questionBufferSize - 1)
+        {
+            questionBuffer_[currentLength]     = key;
+            questionBuffer_[currentLength + 1] = '\0';
+            tft_.setTextColor(textColor_, backgroundColor_);
+            tft_.setTextSize(3);
+            tft_.setTextDatum(MC_DATUM);
+            tft_.setTextPadding(rect_.width);
+            tft_.drawString(questionBuffer_,
+                            rect_.x0 + rect_.width / 2,
+                            rect_.y0 + rect_.height / 5);
+        }
+    }
 
 private:
     TFT_eSPI& tft_;
@@ -336,9 +362,9 @@ private:
     constexpr static int maxOperand               = 100;
     constexpr static unsigned long operationsSize = 4;
     const char operations[operationsSize]         = {'+', '-', '*', '/'};
-    /// Enough to contain something like "100 + 100 = ?" + null terminator
-    constexpr static unsigned long questionsBufferSize = 14;
-    char questionsBuffer[questionsBufferSize]          = {'\0'};
+    /// Enough to contain something like "nnn + nnn = nnnn" + null terminator
+    constexpr static size_t questionBufferSize = 17;
+    char questionBuffer_[questionBufferSize]   = {'\0'};
 
     MathsQuestion generateQuestion()
     {
