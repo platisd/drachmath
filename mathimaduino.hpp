@@ -67,20 +67,37 @@ enum class NavigationEvent
     Press
 };
 
-template<int Rows, int Columns, typename TFT_eSPI, typename... Keys>
+template<typename... Labels>
+struct KeyLabels
+{
+    constexpr KeyLabels(Labels... labels)
+        : labels{labels...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Labels);
+    char labels[size];
+};
+
+template<typename... Labels>
+constexpr KeyLabels<Labels...> makeKeyLabels(Labels... labels)
+{
+    return KeyLabels<Labels...>{labels...};
+}
+
+template<int Rows, int Columns, typename TFT_eSPI, typename Labels>
 class TftKeyboard
 {
 public:
-    TftKeyboard(TFT_eSPI& tft, KeyColors colors, Keys... keys)
+    TftKeyboard(TFT_eSPI& tft, KeyColors colors, Labels labels)
         : tft_{tft}
         , labelColor_{makeColor(colors.label)}
         , outlineColor_{makeColor(colors.outline)}
         , unpressedColor_{makeColor(colors.unpressed)}
         , pressedColor_{makeColor(colors.pressed)}
-        , labels_{keys...}
+        , labels_{labels}
     {
-        static_assert(sizeof...(Keys) <= Rows * Columns,
-                      "Too many keys for the keyboard layout");
+        static_assert(Labels::size == Rows * Columns,
+                      "Number of labels must match Rows * Columns");
     }
 
     void begin(RectangleDimensions rect)
@@ -100,11 +117,11 @@ public:
             for (int col = 0; col < Columns; ++col)
             {
                 int index = row * Columns + col;
-                if (index >= sizeof...(Keys))
+                if (index >= Labels::size)
                 {
                     break;
                 }
-                char label = labels_[index];
+                char label = labels_.labels[index];
                 int x      = rect_.x0 + col * keyWidth;
                 int y      = rect_.y0 + row * keyHeight;
                 tft_.drawRoundRect(
@@ -141,9 +158,9 @@ public:
         // Draw the label for the previously selected key
         int prevIndex = previousRow * Columns + previousCol;
         tft_.setTextSize(1); // Text size multiplier to 1 since we use drawChar
-        if (prevIndex < sizeof...(Keys))
+        if (prevIndex < Labels::size)
         {
-            char prevLabel = labels_[prevIndex];
+            char prevLabel = labels_.labels[prevIndex];
             tft_.setTextColor(labelColor_);
             tft_.drawChar(prevLabel,
                           prevX + keyWidth / 2 - 4,
@@ -161,9 +178,9 @@ public:
                            pressedColor_);
         // Draw the label for the newly selected key
         int newIndex = selectedRow_ * Columns + selectedCol_;
-        if (newIndex < sizeof...(Keys))
+        if (newIndex < Labels::size)
         {
-            char newLabel = labels_[newIndex];
+            char newLabel = labels_.labels[newIndex];
             tft_.setTextColor(labelColor_);
             tft_.drawChar(
                 newLabel, newX + keyWidth / 2 - 4, newY + keyHeight / 2 - 8, 2);
@@ -211,16 +228,16 @@ private:
     int32_t outlineColor_;
     int32_t unpressedColor_;
     int32_t pressedColor_;
-    char labels_[sizeof...(Keys)];
+    Labels labels_;
     RectangleDimensions rect_{};
     int selectedRow_{0};
     int selectedCol_{0};
 };
 
-template<int Rows, int Columns, typename TFT_eSPI, typename... Keys>
-auto makeKeyboard(TFT_eSPI& tft, KeyColors colors, Keys... keys)
+template<int Rows, int Columns, typename TFT_eSPI, typename Labels>
+auto makeKeyboard(TFT_eSPI& tft, KeyColors colors, Labels labels)
 {
-    return TftKeyboard<Rows, Columns, TFT_eSPI, Keys...>{tft, colors, keys...};
+    return TftKeyboard<Rows, Columns, TFT_eSPI, Labels>{tft, colors, labels};
 }
 
 struct MathsQuestion
