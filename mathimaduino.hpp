@@ -67,6 +67,24 @@ enum class NavigationEvent
     Press
 };
 
+using KeyListener = void (*)(char);
+template<typename... Listeners>
+struct KeyboardListeners
+{
+    constexpr KeyboardListeners(Listeners... listeners)
+        : listeners{listeners...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Listeners);
+    KeyListener listeners[size];
+};
+
+template<typename... Listeners>
+constexpr KeyboardListeners<Listeners...> makeKeyboardListeners(Listeners... listeners)
+{
+    return KeyboardListeners<Listeners...>{listeners...};
+}
+
 template<typename... Labels>
 struct KeyLabels
 {
@@ -84,17 +102,25 @@ constexpr KeyLabels<Labels...> makeKeyLabels(Labels... labels)
     return KeyLabels<Labels...>{labels...};
 }
 
-template<int Rows, int Columns, typename TFT_eSPI, typename Labels>
+template<int Rows,
+         int Columns,
+         typename TFT_eSPI,
+         typename Labels,
+         typename KeyListeners>
 class TftKeyboard
 {
 public:
-    TftKeyboard(TFT_eSPI& tft, KeyColors colors, Labels labels)
+    TftKeyboard(TFT_eSPI& tft,
+                KeyColors colors,
+                Labels labels,
+                KeyListeners listeners)
         : tft_{tft}
         , labelColor_{makeColor(colors.label)}
         , outlineColor_{makeColor(colors.outline)}
         , unpressedColor_{makeColor(colors.unpressed)}
         , pressedColor_{makeColor(colors.pressed)}
         , labels_{labels}
+        , listeners_{listeners}
     {
         static_assert(Labels::size == Rows * Columns,
                       "Number of labels must match Rows * Columns");
@@ -229,15 +255,25 @@ private:
     int32_t unpressedColor_;
     int32_t pressedColor_;
     Labels labels_;
+    KeyListeners listeners_;
+
     RectangleDimensions rect_{};
     int selectedRow_{0};
     int selectedCol_{0};
 };
 
-template<int Rows, int Columns, typename TFT_eSPI, typename Labels>
-auto makeKeyboard(TFT_eSPI& tft, KeyColors colors, Labels labels)
+template<int Rows,
+         int Columns,
+         typename TFT_eSPI,
+         typename Labels,
+         typename KeyListeners>
+auto makeKeyboard(TFT_eSPI& tft,
+                  KeyColors colors,
+                  Labels labels,
+                  KeyListeners listeners)
 {
-    return TftKeyboard<Rows, Columns, TFT_eSPI, Labels>{tft, colors, labels};
+    return TftKeyboard<Rows, Columns, TFT_eSPI, Labels, KeyListeners>{
+        tft, colors, labels, listeners};
 }
 
 struct MathsQuestion
@@ -285,6 +321,8 @@ public:
                         rect_.x0 + rect_.width / 2,
                         rect_.y0 + rect_.height / 5);
     }
+
+    void handleKeyboardPress(char key) {}
 
 private:
     TFT_eSPI& tft_;
