@@ -20,7 +20,8 @@ struct TftColor
 
 int32_t makeColor(TftColor color)
 {
-    return (color.r << 16) | (color.g << 8) | color.b;
+    // Pack into 16-bit RGB565: 5 bits red, 6 bits green, 5 bits blue.
+    return ((color.r & 0xF8) << 8) | ((color.g & 0xFC) << 3) | (color.b >> 3);
 }
 
 namespace colors

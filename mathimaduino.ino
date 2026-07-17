@@ -7,10 +7,10 @@ volatile NavigationEvent lastEvent    = NavigationEvent::None;
 volatile unsigned long lastEventTime  = 0;
 constexpr unsigned long debounceDelay = 50; // milliseconds
 const KeyColors keyColors
-    = {colors::White, colors::Red, colors::Green, colors::Gray};
+    = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto keyLabels
     = makeKeyLabels('1', '2', '3', '4', '5', '6', '7', '8', '9', '0');
-auto mathsQuiz    = makeMathsQuiz(tft, colors::Black, colors::White);
+auto mathsQuiz    = makeMathsQuiz(tft, colors::Red, colors::White);
 auto keyListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
