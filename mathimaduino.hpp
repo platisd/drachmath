@@ -362,8 +362,8 @@ private:
     constexpr static int maxOperand               = 100;
     constexpr static unsigned long operationsSize = 4;
     const char operations[operationsSize]         = {'+', '-', '*', '/'};
-    /// Enough to contain something like "nnn + nnn = nnnn" + null terminator
-    constexpr static size_t questionBufferSize = 17;
+    /// Enough to contain something like "nnn + nnn = nnnnn" + null terminator
+    constexpr static size_t questionBufferSize = 18;
     char questionBuffer_[questionBufferSize]   = {'\0'};
 
     MathsQuestion generateQuestion()
