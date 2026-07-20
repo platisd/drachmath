@@ -11,6 +11,29 @@
  * pocket money.
  */
 
+inline void playTone(int halfPeriodUs, int durationMs)
+{
+    for (long i = 0; i < durationMs * 1000L; i += halfPeriodUs * 2)
+    {
+        digitalWrite(WIO_BUZZER, HIGH);
+        delayMicroseconds(halfPeriodUs);
+        digitalWrite(WIO_BUZZER, LOW);
+        delayMicroseconds(halfPeriodUs);
+    }
+}
+
+inline void playCorrectSound()
+{
+    playTone(1519, 120);
+    playTone(956, 200);
+}
+
+inline void playWrongSound()
+{
+    playTone(2551, 150);
+    playTone(3040, 300);
+}
+
 struct TftColor
 {
     int r{};
@@ -18,13 +41,13 @@ struct TftColor
     int b{};
 };
 
-int32_t makeColor(TftColor color)
+inline int32_t makeColor(TftColor color)
 {
     // Pack into 16-bit RGB565: 5 bits red, 6 bits green, 5 bits blue.
     return ((color.r & 0xF8) << 8) | ((color.g & 0xFC) << 3) | (color.b >> 3);
 }
 
-void putLargerFirst(int& a, int& b)
+inline void putLargerFirst(int& a, int& b)
 {
     if (a < b)
     {
@@ -381,11 +404,13 @@ public:
             if (userAnswer == currentCorrectAnswer_)
             {
                 // Correct answer, draw a new question
+                playCorrectSound();
                 drawNewQuestion();
             }
             else
             {
                 // Incorrect answer, clear the user input
+                playWrongSound();
                 questionBuffer_[userAnswerIndex_] = '\0';
                 tft_.setTextColor(textColor_, backgroundColor_);
                 tft_.setTextSize(3);

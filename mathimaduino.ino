@@ -98,6 +98,7 @@ void setup()
     pinMode(WIO_KEY_A, INPUT_PULLUP);
     pinMode(WIO_KEY_B, INPUT_PULLUP);
     pinMode(WIO_KEY_C, INPUT_PULLUP);
+    pinMode(WIO_BUZZER, OUTPUT);
     attachInterrupts();
     Serial.begin(115200);
 
