@@ -24,6 +24,16 @@ int32_t makeColor(TftColor color)
     return ((color.r & 0xF8) << 8) | ((color.g & 0xFC) << 3) | (color.b >> 3);
 }
 
+void putLargerFirst(int& a, int& b)
+{
+    if (a < b)
+    {
+        int temp = a;
+        a        = b;
+        b        = temp;
+    }
+}
+
 namespace colors
 {
 constexpr TftColor Black{0, 0, 0};
@@ -66,6 +76,14 @@ enum class NavigationEvent
     Left,
     Right,
     Press
+};
+
+enum class ButtonEvent
+{
+    None,
+    Left,
+    Middle,
+    Right
 };
 
 using KeyListener = void (*)(char);
@@ -318,7 +336,7 @@ public:
     {
         auto currentQuestion  = generateQuestion();
         currentCorrectAnswer_ = currentQuestion.answer;
-        tft_.setTextColor(textColor_);
+        tft_.setTextColor(textColor_, backgroundColor_);
         tft_.setTextSize(3);
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextPadding(rect_.width);
@@ -332,6 +350,7 @@ public:
         tft_.drawString(questionBuffer_,
                         rect_.x0 + rect_.width / 2,
                         rect_.y0 + rect_.height / 5);
+        userAnswerIndex_ = strlen(questionBuffer_);
     }
 
     void handleKeyboardPress(char key)
@@ -351,6 +370,68 @@ public:
         }
     }
 
+    void handleButtonEvent(ButtonEvent event)
+    {
+        switch (event)
+        {
+        case ButtonEvent::Left:
+        {
+            // Check the answer
+            int userAnswer = atoi(&questionBuffer_[userAnswerIndex_]);
+            if (userAnswer == currentCorrectAnswer_)
+            {
+                // Correct answer, draw a new question
+                drawNewQuestion();
+            }
+            else
+            {
+                // Incorrect answer, clear the user input
+                questionBuffer_[userAnswerIndex_] = '\0';
+                tft_.setTextColor(textColor_, backgroundColor_);
+                tft_.setTextSize(3);
+                tft_.setTextDatum(MC_DATUM);
+                tft_.setTextPadding(rect_.width);
+                tft_.drawString(questionBuffer_,
+                                rect_.x0 + rect_.width / 2,
+                                rect_.y0 + rect_.height / 5);
+            }
+        }
+        break;
+        case ButtonEvent::Middle:
+        {
+            // Clear the last character of the user input
+            size_t currentLength = strlen(questionBuffer_);
+            if (currentLength > userAnswerIndex_)
+            {
+                questionBuffer_[currentLength - 1] = '\0';
+                tft_.setTextColor(textColor_, backgroundColor_);
+                tft_.setTextSize(3);
+                tft_.setTextDatum(MC_DATUM);
+                tft_.setTextPadding(rect_.width);
+                tft_.drawString(questionBuffer_,
+                                rect_.x0 + rect_.width / 2,
+                                rect_.y0 + rect_.height / 5);
+            }
+        }
+        break;
+        case ButtonEvent::Right:
+        {
+            // Clear the entire user input
+            questionBuffer_[userAnswerIndex_] = '\0';
+            tft_.setTextColor(textColor_, backgroundColor_);
+            tft_.setTextSize(3);
+            tft_.setTextDatum(MC_DATUM);
+            tft_.setTextPadding(rect_.width);
+            tft_.drawString(questionBuffer_,
+                            rect_.x0 + rect_.width / 2,
+                            rect_.y0 + rect_.height / 5);
+        }
+        break;
+        default:
+            break;
+        }
+    }
+
 private:
     TFT_eSPI& tft_;
     int32_t backgroundColor_;
@@ -365,6 +446,7 @@ private:
     /// Enough to contain something like "nnn + nnn = nnnnn" + null terminator
     constexpr static size_t questionBufferSize = 18;
     char questionBuffer_[questionBufferSize]   = {'\0'};
+    size_t userAnswerIndex_{}; // Index of user answer in questionBuffer_
 
     MathsQuestion generateQuestion()
     {
@@ -377,12 +459,14 @@ private:
             return MathsQuestion{
                 operand1, operand2, operation, operand1 + operand2};
         case '-':
+            putLargerFirst(operand1, operand2);
             return MathsQuestion{
                 operand1, operand2, operation, operand1 - operand2};
         case '*':
             return MathsQuestion{
                 operand1, operand2, operation, operand1 * operand2};
         case '/':
+            putLargerFirst(operand1, operand2);
             return MathsQuestion{
                 operand1, operand2, operation, operand1 / operand2};
         default:
