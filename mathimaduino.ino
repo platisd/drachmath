@@ -16,6 +16,9 @@ auto mathsQuiz    = makeMathsQuiz(tft, colors::Red, colors::White);
 auto keyListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
+auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White);
+auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White);
+auto rightButtonLabel  = makeLabel(tft, colors::Black, colors::White);
 
 void attachInterrupts()
 {
@@ -114,6 +117,14 @@ void setup()
         0, tft.height() / 3, tft.width(), tft.height() / 3, 5};
     mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
     mathsQuiz.drawNewQuestion();
+    // the button labels are on the top left of the screen and are a few pixels
+    // large. They are roughly 10% of the screen away from each o ther
+    leftButtonLabel.begin({tft.width() * 0.055F, 0});
+    leftButtonLabel.draw("OK");
+    middleButtonLabel.begin({tft.width() * 0.28F, 0});
+    middleButtonLabel.draw("<");
+    rightButtonLabel.begin({tft.width() * 0.55F, 0});
+    rightButtonLabel.draw("X");
 }
 
 void loop()

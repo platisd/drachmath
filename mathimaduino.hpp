@@ -74,6 +74,12 @@ constexpr TftColor Gray{128, 128, 128};
 constexpr TftColor Orange{255, 180, 0};
 } // namespace colors
 
+struct Point
+{
+    int x{};
+    int y{};
+};
+
 struct RectangleDimensions
 {
     int x0{};
@@ -505,4 +511,42 @@ MathsQuiz<TFT_eSPI>
 makeMathsQuiz(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
 {
     return MathsQuiz<TFT_eSPI>{tft, backgroundColor, textColor};
+}
+
+template<typename TFT_eSPI>
+class Label
+{
+public:
+    Label(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
+        : tft_{tft}
+        , backgroundColor_{makeColor(backgroundColor)}
+        , textColor_{makeColor(textColor)}
+    {
+    }
+
+    void begin(Point point)
+    {
+        point_ = point;
+    }
+
+    void draw(const char* label)
+    {
+        tft_.setTextColor(textColor_, backgroundColor_);
+        tft_.setTextSize(1);
+        tft_.setTextPadding(tft_.width() / 9);
+        tft_.drawString(label, point_.x, point_.y);
+    }
+
+private:
+    TFT_eSPI& tft_;
+    int32_t backgroundColor_;
+    int32_t textColor_;
+    Point point_{};
+};
+
+template<typename TFT_eSPI>
+Label<TFT_eSPI>
+makeLabel(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
+{
+    return Label<TFT_eSPI>{tft, backgroundColor, textColor};
 }
