@@ -335,6 +335,25 @@ auto makeKeyboard(TFT_eSPI& tft,
         tft, colors, labels, listeners};
 }
 
+using QuizListener = void (*)();
+
+template<typename... Listeners>
+struct QuizListeners
+{
+    constexpr QuizListeners(Listeners... listeners)
+        : listeners{listeners...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Listeners);
+    QuizListener listeners[size];
+};
+
+template<typename... Listeners>
+constexpr QuizListeners<Listeners...> makeQuizListeners(Listeners... listeners)
+{
+    return QuizListeners<Listeners...>{listeners...};
+}
+
 struct MathsQuestion
 {
     int operand1{};
@@ -345,14 +364,18 @@ struct MathsQuestion
 
 /// The MathsQuiz class is responsible for managing the maths quiz logic, i.e.
 /// generating the (current and next) questions and checking the answers
-template<typename TFT_eSPI>
+template<typename TFT_eSPI, typename Listeners>
 class MathsQuiz
 {
 public:
-    MathsQuiz(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
+    MathsQuiz(TFT_eSPI& tft,
+              TftColor backgroundColor,
+              TftColor textColor,
+              Listeners listeners)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
+        , listeners_{listeners}
     {
     }
 
@@ -411,6 +434,10 @@ public:
             {
                 // Correct answer, draw a new question
                 playCorrectSound();
+                for (const auto& listener : listeners_.listeners)
+                {
+                    listener();
+                }
                 drawNewQuestion();
             }
             else
@@ -467,6 +494,7 @@ private:
     TFT_eSPI& tft_;
     int32_t backgroundColor_;
     int32_t textColor_;
+    Listeners listeners_;
     RectangleDimensions rect_{};
     int currentCorrectAnswer_{};
 
@@ -506,21 +534,28 @@ private:
     }
 };
 
-template<typename TFT_eSPI>
-MathsQuiz<TFT_eSPI>
-makeMathsQuiz(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
+template<typename TFT_eSPI, typename Listeners>
+MathsQuiz<TFT_eSPI, Listeners> makeMathsQuiz(TFT_eSPI& tft,
+                                             TftColor backgroundColor,
+                                             TftColor textColor,
+                                             Listeners listeners)
 {
-    return MathsQuiz<TFT_eSPI>{tft, backgroundColor, textColor};
+    return MathsQuiz<TFT_eSPI, Listeners>{
+        tft, backgroundColor, textColor, listeners};
 }
 
 template<typename TFT_eSPI>
 class Label
 {
 public:
-    Label(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
+    Label(TFT_eSPI& tft,
+          TftColor backgroundColor,
+          TftColor textColor,
+          int textSize = 1)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
+        , textSize_{textSize}
     {
     }
 
@@ -532,7 +567,7 @@ public:
     void draw(const char* label)
     {
         tft_.setTextColor(textColor_, backgroundColor_);
-        tft_.setTextSize(1);
+        tft_.setTextSize(textSize_);
         tft_.setTextPadding(tft_.width() / 9);
         tft_.drawString(label, point_.x, point_.y);
     }
@@ -541,12 +576,57 @@ private:
     TFT_eSPI& tft_;
     int32_t backgroundColor_;
     int32_t textColor_;
+    int textSize_;
     Point point_{};
 };
 
 template<typename TFT_eSPI>
-Label<TFT_eSPI>
-makeLabel(TFT_eSPI& tft, TftColor backgroundColor, TftColor textColor)
+Label<TFT_eSPI> makeLabel(TFT_eSPI& tft,
+                          TftColor backgroundColor,
+                          TftColor textColor,
+                          int textSize = 1)
 {
-    return Label<TFT_eSPI>{tft, backgroundColor, textColor};
+    return Label<TFT_eSPI>{tft, backgroundColor, textColor, textSize};
+}
+
+template<typename Lbl, typename TFT_eSPI>
+class ScoreKeeper
+{
+public:
+    ScoreKeeper(Lbl& label, TFT_eSPI& tft)
+        : label_{label}
+        , tft_{tft}
+    {
+    }
+
+    void increment()
+    {
+        ++score_;
+        draw();
+    }
+
+    void decrement()
+    {
+        score_ = 0;
+        draw();
+    }
+
+    void draw()
+    {
+        tft_.setTextDatum(TR_DATUM);
+        snprintf(scoreBuffer_, sizeof(scoreBuffer_), "# %d", score_);
+        label_.draw(scoreBuffer_);
+    }
+
+private:
+    Lbl& label_;
+    TFT_eSPI& tft_;
+    int score_{0};
+    char scoreBuffer_[16] = {'\0'};
+};
+
+template<typename Lbl, typename TFT_eSPI>
+ScoreKeeper<Lbl, TFT_eSPI> makeScoreKeeper(Lbl& label, TFT_eSPI& tft)
+{
+    return ScoreKeeper<Lbl, TFT_eSPI>{label, tft};
 }

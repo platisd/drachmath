@@ -8,13 +8,17 @@ volatile unsigned long lastNavigationEventTime = 0;
 volatile ButtonEvent lastButtonEvent           = ButtonEvent::None;
 volatile unsigned long lastButtonEventTime     = 0;
 constexpr unsigned long debounceDelay          = 50; // milliseconds
-const KeyColors keyColors
-    = {colors::White, colors::Black, colors::Green, colors::Gray};
-auto keyLabels
-    = makeKeyLabels('1', '2', '3', '4', '5', '6', '7', '8', '9', '0');
-auto mathsQuiz    = makeMathsQuiz(tft, colors::Red, colors::White);
+auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 2);
+auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
+auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
+auto mathsQuiz
+    = makeMathsQuiz(tft, colors::Red, colors::White, mathsQuizListeners);
 auto keyListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
+auto keyLabels
+    = makeKeyLabels('1', '2', '3', '4', '5', '6', '7', '8', '9', '0');
+const KeyColors keyColors
+    = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
 auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White);
 auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White);
@@ -125,6 +129,8 @@ void setup()
     middleButtonLabel.draw("<");
     rightButtonLabel.begin({tft.width() * 0.55F, 0});
     rightButtonLabel.draw("X");
+    scoreLabel.begin({tft.width(), 0});
+    scoreKeeper.draw();
 }
 
 void loop()
