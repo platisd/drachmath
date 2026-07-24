@@ -650,3 +650,129 @@ ScoreKeeper<Lbl, TFT_eSPI> makeScoreKeeper(Lbl& label, TFT_eSPI& tft)
 {
     return ScoreKeeper<Lbl, TFT_eSPI>{label, tft};
 }
+
+using ButtonListener = void (*)(ButtonEvent);
+template<typename... Listeners>
+struct ButtonListeners
+{
+    constexpr ButtonListeners(Listeners... listeners)
+        : listeners{listeners...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Listeners);
+    ButtonListener listeners[size];
+};
+
+template<typename... Listeners>
+constexpr ButtonListeners<Listeners...>
+makeButtonListeners(Listeners... listeners)
+{
+    return ButtonListeners<Listeners...>{listeners...};
+}
+
+using NavigationListener = void (*)(NavigationEvent);
+template<typename... Listeners>
+struct NavigationListeners
+{
+    constexpr NavigationListeners(Listeners... listeners)
+        : listeners{listeners...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Listeners);
+    NavigationListener listeners[size];
+};
+
+template<typename... Listeners>
+constexpr NavigationListeners<Listeners...>
+makeNavigationListeners(Listeners... listeners)
+{
+    return NavigationListeners<Listeners...>{listeners...};
+}
+
+template<typename NavigationListeners, typename ButtonListeners>
+class InputHandler
+{
+public:
+    InputHandler(NavigationListeners navigationListeners,
+                 ButtonListeners buttonListeners)
+        : navigationListeners_{navigationListeners}
+        , buttonListeners_{buttonListeners}
+    {
+    }
+
+    /// Called by the navigation button ISRs
+    void updateNavigationEvent(NavigationEvent event)
+    {
+        lastNavigationEvent_     = event;
+        lastNavigationEventTime_ = millis();
+    }
+
+    /// Called by the push button ISRs
+    void updateButtonEvent(ButtonEvent event)
+    {
+        lastButtonEvent_     = event;
+        lastButtonEventTime_ = millis();
+    }
+
+    /// Must be called in the main loop to process events
+    void handleEvents()
+    {
+        const auto currentTime = millis();
+        if (lastNavigationEvent_ != NavigationEvent::None)
+        {
+            if (currentTime - lastNavigationEventTime_ > debounceDelay_)
+            {
+                for (const auto& listener : navigationListeners_.listeners)
+                {
+                    listener(lastNavigationEvent_);
+                }
+                lastNavigationEvent_ = NavigationEvent::None;
+            }
+        }
+        if (lastButtonEvent_ != ButtonEvent::None)
+        {
+            if (currentTime - lastButtonEventTime_ > debounceDelay_)
+            {
+                for (const auto& listener : buttonListeners_.listeners)
+                {
+                    listener(lastButtonEvent_);
+                }
+                lastButtonEvent_ = ButtonEvent::None;
+            }
+        }
+        // Special handling for WIO_KEY_A since we can't use an interrupt for it
+        else if (digitalRead(WIO_KEY_A) == LOW)
+        {
+            // Longer debounce needed for polling at LOW state (opposed to an
+            // edge) because the button is held down "longer" than a single edge
+            // event.
+            if (currentTime - lastButtonEventTime_ > debounceDelay_ * 5)
+            {
+                lastButtonEventTime_ = currentTime;
+                for (const auto& listener : buttonListeners_.listeners)
+                {
+                    listener(ButtonEvent::Right);
+                }
+                lastButtonEvent_ = ButtonEvent::None;
+            }
+        }
+    }
+
+private:
+    NavigationListeners navigationListeners_;
+    ButtonListeners buttonListeners_;
+    volatile NavigationEvent lastNavigationEvent_{NavigationEvent::None};
+    volatile unsigned long lastNavigationEventTime_{0};
+    volatile ButtonEvent lastButtonEvent_{ButtonEvent::None};
+    volatile unsigned long lastButtonEventTime_{0};
+    constexpr static unsigned long debounceDelay_{50}; // milliseconds
+};
+
+template<typename NavigationListeners, typename ButtonListeners>
+InputHandler<NavigationListeners, ButtonListeners>
+makeInputHandler(NavigationListeners navigationListeners,
+                 ButtonListeners buttonListeners)
+{
+    return InputHandler<NavigationListeners, ButtonListeners>{
+        navigationListeners, buttonListeners};
+}

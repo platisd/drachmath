@@ -3,11 +3,6 @@
 
 TFT_eSPI tft;
 
-volatile NavigationEvent lastNavigationEvent   = NavigationEvent::None;
-volatile unsigned long lastNavigationEventTime = 0;
-volatile ButtonEvent lastButtonEvent           = ButtonEvent::None;
-volatile unsigned long lastButtonEventTime     = 0;
-constexpr unsigned long debounceDelay          = 50; // milliseconds
 auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 2);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
@@ -20,51 +15,36 @@ auto keyLabels
 const KeyColors keyColors
     = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
-auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White);
-auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White);
-auto rightButtonLabel  = makeLabel(tft, colors::Black, colors::White);
+auto leftButtonLabel     = makeLabel(tft, colors::Black, colors::White);
+auto middleButtonLabel   = makeLabel(tft, colors::Black, colors::White);
+auto rightButtonLabel    = makeLabel(tft, colors::Black, colors::White);
+auto navigationListeners = makeNavigationListeners(
+    [](NavigationEvent event) { keyboard.handleNavigationEvent(event); });
+auto buttonListeners = makeButtonListeners(
+    [](ButtonEvent event) { mathsQuiz.handleButtonEvent(event); });
+auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
 
 void attachInterrupts()
 {
     attachInterrupt(
         digitalPinToInterrupt(WIO_5S_UP),
-        []
-        {
-            lastNavigationEvent     = NavigationEvent::Up;
-            lastNavigationEventTime = millis();
-        },
+        [] { inputHandler.updateNavigationEvent(NavigationEvent::Up); },
         RISING);
     attachInterrupt(
         digitalPinToInterrupt(WIO_5S_DOWN),
-        []
-        {
-            lastNavigationEvent     = NavigationEvent::Down;
-            lastNavigationEventTime = millis();
-        },
+        [] { inputHandler.updateNavigationEvent(NavigationEvent::Down); },
         RISING);
     attachInterrupt(
         digitalPinToInterrupt(WIO_5S_LEFT),
-        []
-        {
-            lastNavigationEvent     = NavigationEvent::Left;
-            lastNavigationEventTime = millis();
-        },
+        [] { inputHandler.updateNavigationEvent(NavigationEvent::Left); },
         RISING);
     attachInterrupt(
         digitalPinToInterrupt(WIO_5S_RIGHT),
-        []
-        {
-            lastNavigationEvent     = NavigationEvent::Right;
-            lastNavigationEventTime = millis();
-        },
+        [] { inputHandler.updateNavigationEvent(NavigationEvent::Right); },
         RISING);
     attachInterrupt(
         digitalPinToInterrupt(WIO_5S_PRESS),
-        []
-        {
-            lastNavigationEvent     = NavigationEvent::Press;
-            lastNavigationEventTime = millis();
-        },
+        [] { inputHandler.updateNavigationEvent(NavigationEvent::Press); },
         RISING);
     // Cannot attach an interrupt to both WIO_KEY_A and WIO_5S_UP
     // as they share the same external interrupt line. Poll instead.
@@ -72,25 +52,16 @@ void attachInterrupts()
     //     digitalPinToInterrupt(WIO_KEY_A),
     //     []
     //     {
-    //         lastButtonEvent     = ButtonEvent::Right;
-    //         lastButtonEventTime = millis();
+    //         inputHandler.updateButtonEvent(ButtonEvent::Right);
     //     },
     //     RISING);
     attachInterrupt(
         digitalPinToInterrupt(WIO_KEY_B),
-        []
-        {
-            lastButtonEvent     = ButtonEvent::Middle;
-            lastButtonEventTime = millis();
-        },
+        [] { inputHandler.updateButtonEvent(ButtonEvent::Middle); },
         RISING);
     attachInterrupt(
         digitalPinToInterrupt(WIO_KEY_C),
-        []
-        {
-            lastButtonEvent     = ButtonEvent::Left;
-            lastButtonEventTime = millis();
-        },
+        [] { inputHandler.updateButtonEvent(ButtonEvent::Left); },
         RISING);
 }
 
@@ -135,33 +106,5 @@ void setup()
 
 void loop()
 {
-    if (lastNavigationEvent != NavigationEvent::None)
-    {
-        const auto currentTime = millis();
-        if (currentTime - lastNavigationEventTime > debounceDelay)
-        {
-            keyboard.handleNavigationEvent(lastNavigationEvent);
-            lastNavigationEvent = NavigationEvent::None;
-        }
-    }
-    if (lastButtonEvent != ButtonEvent::None)
-    {
-        const auto currentTime = millis();
-        if (currentTime - lastButtonEventTime > debounceDelay)
-        {
-            mathsQuiz.handleButtonEvent(lastButtonEvent);
-            lastButtonEvent = ButtonEvent::None;
-        }
-    }
-    else if (digitalRead(WIO_KEY_A) == LOW)
-    {
-        const auto currentTime = millis();
-        // Longer debounce needed for polling at LOW state (opposed to an edge)
-        // because the button is held down "longer" than a single edge event.
-        if (currentTime - lastButtonEventTime > debounceDelay * 5)
-        {
-            mathsQuiz.handleButtonEvent(ButtonEvent::Right);
-            lastButtonEventTime = currentTime;
-        }
-    }
+    inputHandler.handleEvents();
 }
