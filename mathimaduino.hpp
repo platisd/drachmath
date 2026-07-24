@@ -57,6 +57,25 @@ inline void putLargerFirst(int& a, int& b)
     }
 }
 
+inline void adjustOperandsForPerfectDivision(int& a, int& b)
+{
+    if (a % b == 0)
+    {
+        return;
+    }
+    // Adjust b to be a factor of a
+    // If we adjust a instead we may end up with a number larger than maxOperand
+    // and avoiding that will complicate the logic.
+    for (int i = b; i > 0; --i)
+    {
+        if (a % i == 0)
+        {
+            b = i;
+            return;
+        }
+    }
+}
+
 namespace colors
 {
 constexpr TftColor Black{0, 0, 0};
@@ -526,6 +545,7 @@ private:
                 operand1, operand2, operation, operand1 * operand2};
         case '/':
             putLargerFirst(operand1, operand2);
+            adjustOperandsForPerfectDivision(operand1, operand2);
             return MathsQuestion{
                 operand1, operand2, operation, operand1 / operand2};
         default:

@@ -96,7 +96,7 @@ void attachInterrupts()
 
 void setup()
 {
-    randomSeed(analogRead(A0));
+    randomSeed(analogRead(WIO_LIGHT));
     pinMode(WIO_5S_UP, INPUT_PULLUP);
     pinMode(WIO_5S_DOWN, INPUT_PULLUP);
     pinMode(WIO_5S_LEFT, INPUT_PULLUP);
