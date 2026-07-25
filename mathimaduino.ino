@@ -85,11 +85,11 @@ void setup()
 
     tft.fillScreen(makeColor(colors::Red));
     const RectangleDimensions keyboardAtBottom{
-        0, tft.height() * 2 / 3, tft.width(), tft.height() / 3, 5};
+        0, tft.height() * 2.0F / 3.0F, tft.width(), tft.height() / 3.0F, 5};
     keyboard.begin(keyboardAtBottom);
     keyboard.draw();
     const RectangleDimensions mathsQuizAboveKeyboardInTheMiddle{
-        0, tft.height() / 3, tft.width(), tft.height() / 3, 5};
+        0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
     mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
     mathsQuiz.drawNewQuestion();
     // the button labels are on the top left of the screen and are a few pixels
