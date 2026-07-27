@@ -557,6 +557,11 @@ private:
             return MathsQuestion{
                 operand1, operand2, operation, operand1 - operand2};
         case '*':
+            // Let's make things easier for the kids
+            if (operand1 > 10 && operand2 > 10)
+            {
+                operand2 = random(minOperand, 11);
+            }
             return MathsQuestion{
                 operand1, operand2, operation, operand1 * operand2};
         case '/':
