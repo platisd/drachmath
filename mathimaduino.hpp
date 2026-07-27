@@ -458,11 +458,12 @@ public:
         }
     }
 
-    void handleButtonEvent(ButtonEvent event)
+    /// @return true on exit/transition, false otherwise
+    bool handleButtonEvent(ButtonEvent event)
     {
         if (!enabled_)
         {
-            return;
+            return false;
         }
         switch (event)
         {
@@ -494,7 +495,7 @@ public:
                                 rect_.y0 + rect_.height / 5);
             }
         }
-        break;
+            return false; // Stay in the quiz
         case ButtonEvent::Middle:
         {
             // Clear the last character of the user input
@@ -511,22 +512,15 @@ public:
                                 rect_.y0 + rect_.height / 5);
             }
         }
-        break;
+            return false; // Stay in the quiz
         case ButtonEvent::Right:
         {
-            // Clear the entire user input
-            questionBuffer_[userAnswerIndex_] = '\0';
-            tft_.setTextColor(textColor_, backgroundColor_);
-            tft_.setTextSize(3);
-            tft_.setTextDatum(MC_DATUM);
-            tft_.setTextPadding(rect_.width);
-            tft_.drawString(questionBuffer_,
-                            rect_.x0 + rect_.width / 2,
-                            rect_.y0 + rect_.height / 5);
+            // Exit the quiz and return to the menu
+            enableQuiz(false);
         }
-        break;
+            return true; // Exit the quiz
         default:
-            break;
+            return false; // Stay in the quiz
         }
     }
 
@@ -880,6 +874,23 @@ public:
         if (previousIndex != selectedIndex_)
         {
             drawSelectedEntry(previousIndex);
+        }
+    }
+
+    void handleButtonEvent(ButtonEvent event)
+    {
+        if (!enabled_)
+        {
+            return;
+        }
+        // We only care about the left button which is also serves as select
+        if (event == ButtonEvent::Left)
+        {
+            if (selectedIndex_ < entries_.size)
+            {
+                const auto& entry = entries_.entries[selectedIndex_];
+                enableMenu(entry.onPress());
+            }
         }
     }
 

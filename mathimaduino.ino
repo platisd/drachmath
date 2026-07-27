@@ -62,7 +62,18 @@ auto navigationListeners = makeNavigationListeners(
     [](NavigationEvent event) { keyboard.handleNavigationEvent(event); },
     [](NavigationEvent event) { menu.handleNavigationEvent(event); });
 auto buttonListeners = makeButtonListeners(
-    [](ButtonEvent event) { mathsQuiz.handleButtonEvent(event); });
+    [](ButtonEvent event)
+    {
+        const auto shouldExit = mathsQuiz.handleButtonEvent(event);
+        if (shouldExit)
+        {
+            keyboard.enableKeyboard(false);
+            clearScreenExcludingButtonLabels();
+            menu.enableMenu(true);
+            menu.draw();
+        }
+    },
+    [](ButtonEvent event) { menu.handleButtonEvent(event); });
 auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
 
 void attachInterrupts()
