@@ -194,9 +194,15 @@ public:
                       "Number of labels must match Rows * Columns");
     }
 
+    void enableKeyboard(bool enable)
+    {
+        enabled_ = enable;
+    }
+
     void begin(RectangleDimensions rect)
     {
         rect_ = rect;
+        enableKeyboard(true);
     }
 
     void draw()
@@ -283,6 +289,10 @@ public:
 
     void handleNavigationEvent(NavigationEvent event)
     {
+        if (!enabled_)
+        {
+            return;
+        }
         // Select the appropriate key based on the navigation event
         int previousRow = selectedRow_;
         int previousCol = selectedCol_;
@@ -338,6 +348,7 @@ private:
     RectangleDimensions rect_{};
     int selectedRow_{0};
     int selectedCol_{0};
+    bool enabled_{false};
 };
 
 template<int Rows,
@@ -398,9 +409,15 @@ public:
     {
     }
 
+    void enableQuiz(bool enable)
+    {
+        enabled_ = enable;
+    }
+
     void begin(RectangleDimensions rect)
     {
         rect_ = rect;
+        enableQuiz(true);
     }
 
     void drawNewQuestion()
@@ -443,6 +460,10 @@ public:
 
     void handleButtonEvent(ButtonEvent event)
     {
+        if (!enabled_)
+        {
+            return;
+        }
         switch (event)
         {
         case ButtonEvent::Left:
@@ -516,6 +537,7 @@ private:
     Listeners listeners_;
     RectangleDimensions rect_{};
     int currentCorrectAnswer_{};
+    bool enabled_{false};
 
     constexpr static int minOperand               = 1;
     constexpr static int maxOperand               = 100;
@@ -775,4 +797,180 @@ makeInputHandler(NavigationListeners navigationListeners,
 {
     return InputHandler<NavigationListeners, ButtonListeners>{
         navigationListeners, buttonListeners};
+}
+
+/// @return true if the menu should remain enabled, false if it should be
+/// disabled
+using MenuEntryCallback = bool (*)();
+struct MenuEntry
+{
+    const char* label{};
+    MenuEntryCallback onPress{};
+};
+
+template<typename... Entries>
+struct MenuEntries
+{
+    constexpr MenuEntries(Entries... entries)
+        : entries{entries...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Entries);
+    MenuEntry entries[size];
+};
+
+template<typename... Entries>
+constexpr MenuEntries<Entries...> makeMenuEntries(Entries... entries)
+{
+    return MenuEntries<Entries...>{entries...};
+}
+
+/// Menu with a list of entries and a callback when the menu is exited
+/// Needs to know the TFT_eSPI object to draw the menu on the screen
+template<typename TFT_eSPI, typename Entries>
+class Menu
+{
+public:
+    Menu(TFT_eSPI& tft, Entries entries, KeyColors menuColors)
+        : tft_{tft}
+        , entries_{entries}
+        , labelColor_{makeColor(menuColors.label)}
+        , unSelectedColor_{makeColor(menuColors.unpressed)}
+        , selectedColor_{makeColor(menuColors.pressed)}
+    {
+    }
+
+    void enableMenu(bool enable)
+    {
+        enabled_ = enable;
+    }
+
+    void begin(RectangleDimensions rect)
+    {
+        rect_ = rect;
+        enableMenu(true);
+    }
+
+    void handleNavigationEvent(NavigationEvent event)
+    {
+        if (!enabled_)
+        {
+            return;
+        }
+        int previousIndex = selectedIndex_;
+        switch (event)
+        {
+        case NavigationEvent::Up:
+            selectedIndex_
+                = (selectedIndex_ - 1 + entries_.size) % entries_.size;
+            break;
+        case NavigationEvent::Down:
+            selectedIndex_ = (selectedIndex_ + 1) % entries_.size;
+            break;
+        case NavigationEvent::Press:
+            if (selectedIndex_ < entries_.size)
+            {
+                const auto& entry = entries_.entries[selectedIndex_];
+                enableMenu(entry.onPress());
+            }
+            break;
+        default:
+            break;
+        }
+        if (previousIndex != selectedIndex_)
+        {
+            drawSelectedEntry(previousIndex);
+        }
+    }
+
+    void draw()
+    {
+        tft_.fillRoundRect(rect_.x0,
+                           rect_.y0,
+                           rect_.width,
+                           rect_.height,
+                           rect_.radius,
+                           unSelectedColor_);
+        tft_.drawRoundRect(rect_.x0,
+                           rect_.y0,
+                           rect_.width,
+                           rect_.height,
+                           rect_.radius,
+                           labelColor_); // Outline effect
+        tft_.setTextSize(2);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextPadding(getTextPadding() * 2);
+        for (size_t i = 0; i < entries_.size; ++i)
+        {
+            const auto& entry = entries_.entries[i];
+            int y = rect_.y0 + (i + 1) * rect_.height / (entries_.size + 1);
+            if (i == selectedIndex_)
+            {
+                tft_.setTextColor(labelColor_, selectedColor_);
+                tft_.drawString(entry.label, rect_.x0 + rect_.width / 2, y);
+            }
+            else
+            {
+                tft_.setTextColor(labelColor_, unSelectedColor_);
+                tft_.drawString(entry.label, rect_.x0 + rect_.width / 2, y);
+            }
+        }
+    }
+
+    void drawSelectedEntry(int previousIndex)
+    {
+        // Redraw the previously selected entry with unselected color
+        const auto& previousEntry = entries_.entries[previousIndex];
+        int previousY
+            = rect_.y0
+              + (previousIndex + 1) * rect_.height / (entries_.size + 1);
+        tft_.setTextSize(2);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextPadding(getTextPadding() * 2);
+        tft_.setTextColor(labelColor_, unSelectedColor_);
+        tft_.drawString(
+            previousEntry.label, rect_.x0 + rect_.width / 2, previousY);
+
+        // Draw the newly selected entry with selected color
+        const auto& newEntry = entries_.entries[selectedIndex_];
+        int newY             = rect_.y0
+                   + (selectedIndex_ + 1) * rect_.height / (entries_.size + 1);
+        tft_.setTextColor(labelColor_, selectedColor_);
+        tft_.drawString(newEntry.label, rect_.x0 + rect_.width / 2, newY);
+    }
+
+private:
+    TFT_eSPI& tft_;
+    Entries entries_;
+    int32_t labelColor_;
+    int32_t unSelectedColor_;
+    int32_t selectedColor_;
+    RectangleDimensions rect_{};
+    size_t selectedIndex_{0};
+    bool enabled_{false};
+
+    int getTextPadding() const
+    {
+        // Calculate the maximum width of the menu entries to determine the text
+        // padding Go through the entries and find the max width of the labels
+        // using strlen
+        int maxWidth = 0;
+        for (size_t i = 0; i < entries_.size; ++i)
+        {
+            const auto& entry = entries_.entries[i];
+            int width         = strlen(entry.label);
+            if (width > maxWidth)
+            {
+                maxWidth = width;
+            }
+        }
+        return maxWidth;
+    }
+};
+
+template<typename TFT_eSPI, typename Entries>
+Menu<TFT_eSPI, Entries>
+makeMenu(TFT_eSPI& tft, Entries entries, KeyColors menuColors)
+{
+    return Menu<TFT_eSPI, Entries>{tft, entries, menuColors};
 }

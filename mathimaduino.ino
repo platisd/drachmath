@@ -3,6 +3,7 @@
 
 TFT_eSPI tft;
 
+const TftColor screenBackgroundColor = colors::Red;
 auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 2);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
@@ -15,11 +16,51 @@ auto keyLabels
 const KeyColors keyColors
     = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
-auto leftButtonLabel     = makeLabel(tft, colors::Black, colors::White);
-auto middleButtonLabel   = makeLabel(tft, colors::Black, colors::White);
-auto rightButtonLabel    = makeLabel(tft, colors::Black, colors::White);
+auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White);
+auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White);
+auto rightButtonLabel  = makeLabel(tft, colors::Black, colors::White);
+RectangleDimensions
+    screenAreaExcludingButtonLabels{}; // Will be initialized in setup()
+const auto clearScreenExcludingButtonLabels = []
+{
+    tft.fillRoundRect(screenAreaExcludingButtonLabels.x0,
+                      screenAreaExcludingButtonLabels.y0,
+                      screenAreaExcludingButtonLabels.width,
+                      screenAreaExcludingButtonLabels.height,
+                      screenAreaExcludingButtonLabels.radius,
+                      makeColor(screenBackgroundColor));
+};
+
+auto menuEntries = makeMenuEntries(
+    MenuEntry{
+        "Maths Quiz",
+        []
+        {
+            clearScreenExcludingButtonLabels();
+            const RectangleDimensions keyboardAtBottom{0,
+                                                       tft.height() * 2.0F
+                                                           / 3.0F,
+                                                       tft.width(),
+                                                       tft.height() / 3.0F,
+                                                       5};
+            keyboard.begin(keyboardAtBottom);
+            keyboard.draw();
+            const RectangleDimensions mathsQuizAboveKeyboardInTheMiddle{
+                0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
+            mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
+            mathsQuiz.drawNewQuestion();
+            return false; // Disable the menu since we are now in the quiz
+        }},
+    MenuEntry{"Spelling Quiz", [] { return true; }},
+    MenuEntry{"Settings", [] { return true; }},
+    MenuEntry{"About", [] { return true; }});
+const KeyColors menuColors
+    = {colors::White, colors::Black, colors::Green, colors::Gray};
+auto menu = makeMenu(tft, menuEntries, menuColors);
+
 auto navigationListeners = makeNavigationListeners(
-    [](NavigationEvent event) { keyboard.handleNavigationEvent(event); });
+    [](NavigationEvent event) { keyboard.handleNavigationEvent(event); },
+    [](NavigationEvent event) { menu.handleNavigationEvent(event); });
 auto buttonListeners = makeButtonListeners(
     [](ButtonEvent event) { mathsQuiz.handleButtonEvent(event); });
 auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
@@ -83,15 +124,7 @@ void setup()
     tft.begin();
     tft.setRotation(3);
 
-    tft.fillScreen(makeColor(colors::Red));
-    const RectangleDimensions keyboardAtBottom{
-        0, tft.height() * 2.0F / 3.0F, tft.width(), tft.height() / 3.0F, 5};
-    keyboard.begin(keyboardAtBottom);
-    keyboard.draw();
-    const RectangleDimensions mathsQuizAboveKeyboardInTheMiddle{
-        0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
-    mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
-    mathsQuiz.drawNewQuestion();
+    tft.fillScreen(makeColor(screenBackgroundColor));
     // the button labels are on the top left of the screen and are a few pixels
     // large. They are roughly 10% of the screen away from each o ther
     leftButtonLabel.begin({tft.width() * 0.055F, 0});
@@ -102,6 +135,19 @@ void setup()
     rightButtonLabel.draw("X");
     scoreLabel.begin({tft.width(), 0});
     scoreKeeper.draw();
+    screenAreaExcludingButtonLabels
+        = {0,
+           20, // Roughly the height of the button labels
+           tft.width(),
+           tft.height() - 20, // Roughly the height of the button labels
+           0};
+    const RectangleDimensions menuInTheMiddle{tft.width() / 5.5F,
+                                              tft.height() / 5.0F,
+                                              tft.width() / 1.50F,
+                                              tft.height() / 3.0F,
+                                              5};
+    menu.begin(menuInTheMiddle);
+    menu.draw();
 }
 
 void loop()
