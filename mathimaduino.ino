@@ -31,7 +31,23 @@ const auto clearScreenExcludingButtonLabels = []
                       makeColor(screenBackgroundColor));
 };
 
-auto menuEntries = makeMenuEntries(
+const KeyColors menuColors
+    = {colors::White, colors::Black, colors::Green, colors::Gray};
+auto settingsEntries = makeSettingsEntries(
+    SettingsEntry{MenuEntry{"Max operand value"},
+                  makeMenuEntryConfig("10", "100")},
+    SettingsEntry{MenuEntry{"Max result value"},
+                  makeMenuEntryConfig("10", "100", "1000")},
+    SettingsEntry{MenuEntry{"Math operations"},
+                  makeMenuEntryConfig("+", "+-", "+-*", "+-*/")},
+    SettingsEntry{MenuEntry{"Language"},
+                  makeMenuEntryConfig("Greek", "English")},
+    SettingsEntry{MenuEntry{"Max word length"},
+                  makeMenuEntryConfig("5", "10", "15")});
+
+auto settingsMenu = makeSettingsMenu(tft, settingsEntries, menuColors);
+
+auto mainMenuEntries = makeMenuEntries(
     MenuEntry{
         "Maths Quiz",
         []
@@ -49,18 +65,31 @@ auto menuEntries = makeMenuEntries(
                 0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
             mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
             mathsQuiz.drawNewQuestion();
-            return false; // Disable the menu since we are now in the quiz
+            return false; // Disable the main menu since we are now in the quiz
         }},
-    MenuEntry{"Spelling Quiz", [] { return true; }},
-    MenuEntry{"Settings", [] { return true; }},
-    MenuEntry{"About", [] { return true; }});
-const KeyColors menuColors
-    = {colors::White, colors::Black, colors::Green, colors::Gray};
-auto menu = makeMenu(tft, menuEntries, menuColors);
+    MenuEntry{"Spelling Quiz"},
+    MenuEntry{
+        "Settings",
+        []
+        {
+            clearScreenExcludingButtonLabels();
+            const RectangleDimensions settingsMenuLargeInTheMiddle{
+                tft.width() * 0.025F,
+                tft.height() / 5.0F,
+                tft.width() * 0.95F,
+                tft.height() * 0.5F,
+                5};
+            settingsMenu.begin(settingsMenuLargeInTheMiddle);
+            settingsMenu.draw();
+            return false; // Disable the main menu since we are now in settings
+        }},
+    MenuEntry{"About"});
+auto mainMenu = makeMenu(tft, mainMenuEntries, menuColors);
 
 auto navigationListeners = makeNavigationListeners(
     [](NavigationEvent event) { keyboard.handleNavigationEvent(event); },
-    [](NavigationEvent event) { menu.handleNavigationEvent(event); });
+    [](NavigationEvent event) { settingsMenu.handleNavigationEvent(event); },
+    [](NavigationEvent event) { mainMenu.handleNavigationEvent(event); });
 auto buttonListeners = makeButtonListeners(
     [](ButtonEvent event)
     {
@@ -69,11 +98,21 @@ auto buttonListeners = makeButtonListeners(
         {
             keyboard.enableKeyboard(false);
             clearScreenExcludingButtonLabels();
-            menu.enableMenu(true);
-            menu.draw();
+            mainMenu.enableMenu(true);
+            mainMenu.draw();
         }
     },
-    [](ButtonEvent event) { menu.handleButtonEvent(event); });
+    [](ButtonEvent event)
+    {
+        const auto shouldExit = settingsMenu.handleButtonEvent(event);
+        if (shouldExit)
+        {
+            clearScreenExcludingButtonLabels();
+            mainMenu.enableMenu(true);
+            mainMenu.draw();
+        }
+    },
+    [](ButtonEvent event) { mainMenu.handleButtonEvent(event); });
 auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
 
 void attachInterrupts()
@@ -157,8 +196,8 @@ void setup()
                                               tft.width() / 1.50F,
                                               tft.height() / 3.0F,
                                               5};
-    menu.begin(menuInTheMiddle);
-    menu.draw();
+    mainMenu.begin(menuInTheMiddle);
+    mainMenu.draw();
 }
 
 void loop()

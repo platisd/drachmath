@@ -803,6 +803,12 @@ makeInputHandler(NavigationListeners navigationListeners,
 using MenuEntryCallback = bool (*)();
 struct MenuEntry
 {
+    MenuEntry(
+        const char* label, MenuEntryCallback onPress = [] { return true; })
+        : label{label}
+        , onPress{onPress}
+    {
+    }
     const char* label{};
     MenuEntryCallback onPress{};
 };
@@ -915,7 +921,7 @@ public:
                            labelColor_); // Outline effect
         tft_.setTextSize(2);
         tft_.setTextDatum(MC_DATUM);
-        tft_.setTextPadding(getTextPadding() * 2);
+        tft_.setTextPadding(getTextPadding());
         for (size_t i = 0; i < entries_.size; ++i)
         {
             const auto& entry = entries_.entries[i];
@@ -923,13 +929,12 @@ public:
             if (i == selectedIndex_)
             {
                 tft_.setTextColor(labelColor_, selectedColor_);
-                tft_.drawString(entry.label, rect_.x0 + rect_.width / 2, y);
             }
             else
             {
                 tft_.setTextColor(labelColor_, unSelectedColor_);
-                tft_.drawString(entry.label, rect_.x0 + rect_.width / 2, y);
             }
+            tft_.drawString(entry.label, rect_.x0 + rect_.width / 2, y);
         }
     }
 
@@ -942,7 +947,7 @@ public:
               + (previousIndex + 1) * rect_.height / (entries_.size + 1);
         tft_.setTextSize(2);
         tft_.setTextDatum(MC_DATUM);
-        tft_.setTextPadding(getTextPadding() * 2);
+        tft_.setTextPadding(getTextPadding());
         tft_.setTextColor(labelColor_, unSelectedColor_);
         tft_.drawString(
             previousEntry.label, rect_.x0 + rect_.width / 2, previousY);
@@ -965,16 +970,14 @@ private:
     size_t selectedIndex_{0};
     bool enabled_{false};
 
+    /// @return the width in pixels of the widest entry label
     int getTextPadding() const
     {
-        // Calculate the maximum width of the menu entries to determine the text
-        // padding Go through the entries and find the max width of the labels
-        // using strlen
         int maxWidth = 0;
         for (size_t i = 0; i < entries_.size; ++i)
         {
             const auto& entry = entries_.entries[i];
-            int width         = strlen(entry.label);
+            const int width   = tft_.textWidth(entry.label);
             if (width > maxWidth)
             {
                 maxWidth = width;
@@ -989,4 +992,241 @@ Menu<TFT_eSPI, Entries>
 makeMenu(TFT_eSPI& tft, Entries entries, KeyColors menuColors)
 {
     return Menu<TFT_eSPI, Entries>{tft, entries, menuColors};
+}
+
+/// MenuEntryConfig is a class that holds the values of a MenuEntry that can be
+/// configured by the user Contains an unknown number of options in an array and
+/// a current index that points to the currently selected option
+constexpr size_t maxMenuEntryConfigOptions = 4;
+struct MenuEntryConfig
+{
+    const char* options[maxMenuEntryConfigOptions]{};
+    size_t size{};
+    size_t currentIndex{};
+};
+
+template<typename... Options>
+constexpr MenuEntryConfig makeMenuEntryConfig(Options... options)
+{
+    static_assert(sizeof...(Options) <= maxMenuEntryConfigOptions,
+                  "Too many options; increase maxMenuEntryConfigOptions");
+    return MenuEntryConfig{{options...}, sizeof...(Options), 0};
+}
+
+struct SettingsEntry
+{
+    SettingsEntry(MenuEntry entry, MenuEntryConfig config)
+        : entry{entry}
+        , config{config}
+    {
+    }
+
+    MenuEntry entry;
+    MenuEntryConfig config;
+};
+
+template<typename... Entries>
+struct SettingsEntries
+{
+    constexpr SettingsEntries(Entries... entries)
+        : entries{entries...}
+    {
+    }
+    static constexpr size_t size = sizeof...(Entries);
+    SettingsEntry entries[size];
+};
+
+template<typename... Entries>
+constexpr SettingsEntries<Entries...> makeSettingsEntries(Entries... entries)
+{
+    return SettingsEntries<Entries...>{entries...};
+}
+
+template<typename TFT_eSPI, typename Settings>
+class SettingsMenu
+{
+public:
+    SettingsMenu(TFT_eSPI& tft, Settings settings, KeyColors menuColors)
+        : tft_{tft}
+        , settings_{settings}
+        , labelColor_{makeColor(menuColors.label)}
+        , unSelectedColor_{makeColor(menuColors.unpressed)}
+        , selectedColor_{makeColor(menuColors.pressed)}
+    {
+    }
+
+    void enableSettingsMenu(bool enable)
+    {
+        enabled_ = enable;
+    }
+
+    void begin(RectangleDimensions rect)
+    {
+        rect_ = rect;
+        enableSettingsMenu(true);
+    }
+
+    void draw()
+    {
+        tft_.fillRoundRect(rect_.x0,
+                           rect_.y0,
+                           rect_.width,
+                           rect_.height,
+                           rect_.radius,
+                           unSelectedColor_);
+        tft_.drawRoundRect(rect_.x0,
+                           rect_.y0,
+                           rect_.width,
+                           rect_.height,
+                           rect_.radius,
+                           labelColor_); // Outline effect
+        tft_.setTextSize(2);
+        // Draw each entry and config. Entry aligned to the left, config aligned
+        // to the right
+        for (size_t i = 0; i < settings_.size; ++i)
+        {
+            drawEntry(i, i == selectedIndex_);
+        }
+    }
+
+    void drawSelectedEntry(int previousIndex)
+    {
+        tft_.setTextSize(2);
+        // Redraw the previously selected entry with unselected color
+        drawEntry(previousIndex, false);
+        // Draw the newly selected entry with selected color
+        drawEntry(selectedIndex_, true);
+    }
+
+    void handleNavigationEvent(NavigationEvent event)
+    {
+        if (!enabled_)
+        {
+            return;
+        }
+        int previousIndex  = selectedIndex_;
+        bool configChanged = false;
+        switch (event)
+        {
+        case NavigationEvent::Up:
+            selectedIndex_
+                = (selectedIndex_ - 1 + settings_.size) % settings_.size;
+            break;
+        case NavigationEvent::Down:
+            selectedIndex_ = (selectedIndex_ + 1) % settings_.size;
+            break;
+        case NavigationEvent::Left:
+            // Wrap around to the last option if at the first
+            settings_.entries[selectedIndex_].config.currentIndex
+                = (settings_.entries[selectedIndex_].config.currentIndex - 1
+                   + settings_.entries[selectedIndex_].config.size)
+                  % settings_.entries[selectedIndex_].config.size;
+            configChanged = true;
+            break;
+        case NavigationEvent::Right:
+            // Wrap around to the first option if at the last
+            settings_.entries[selectedIndex_].config.currentIndex
+                = (settings_.entries[selectedIndex_].config.currentIndex + 1)
+                  % settings_.entries[selectedIndex_].config.size;
+            configChanged = true;
+            break;
+        default:
+            break;
+        }
+        if (previousIndex != selectedIndex_ || configChanged)
+        {
+            drawSelectedEntry(previousIndex);
+        }
+    }
+
+    /// @return true on exit, false otherwise
+    bool handleButtonEvent(ButtonEvent event)
+    {
+        if (!enabled_)
+        {
+            return false;
+        }
+        // We only care about the right button which serves as exit
+        if (event == ButtonEvent::Right)
+        {
+            enableSettingsMenu(false);
+            return true; // Exit the settings menu
+        }
+        return false; // Stay in the settings menu
+    }
+
+private:
+    TFT_eSPI& tft_;
+    Settings settings_;
+    int32_t labelColor_;
+    int32_t unSelectedColor_;
+    int32_t selectedColor_;
+    RectangleDimensions rect_{};
+    size_t selectedIndex_{0};
+    bool enabled_{false};
+    // Enough to contain the longest option as `<option>` + null terminator
+    constexpr static size_t optionBufferSize = 16;
+    char optionBuffer_[optionBufferSize];
+
+    void drawEntry(size_t index, bool selected)
+    {
+        const auto& setting = settings_.entries[index];
+        const int y
+            = rect_.y0 + (index + 1) * rect_.height / (settings_.size + 1);
+        tft_.setTextColor(labelColor_,
+                          selected ? selectedColor_ : unSelectedColor_);
+        tft_.setTextDatum(ML_DATUM);
+        // No need for padding, labels are left-aligned and never change
+        tft_.setTextPadding(0);
+        tft_.drawString(setting.entry.label, rect_.x0 + 5, y);
+        // Draw the current config option aligned to the right
+        tft_.setTextDatum(MR_DATUM);
+        tft_.setTextPadding(getOptionPadding(setting.config));
+        formatOption(setting.config.options[setting.config.currentIndex]);
+        if (selected)
+        {
+            // Let's get rid of artifacts
+            tft_.setTextColor(labelColor_, unSelectedColor_);
+            tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
+            tft_.setTextColor(labelColor_, selectedColor_);
+            tft_.setTextPadding(0); // 0 padding, by now we got rid of artifacts
+            tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
+        }
+        else
+        {
+            tft_.setTextColor(labelColor_, unSelectedColor_);
+            tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
+        }
+    }
+
+    void formatOption(const char* option)
+    {
+        snprintf(optionBuffer_, optionBufferSize, "<%s>", option);
+    }
+
+    /// @return the width in pixels of the widest option of this config. Scoped
+    /// to a single config, since an option only ever has to erase another
+    /// option of the same entry. A padding covering the widest option of *any*
+    /// entry would reach into the label of the entries with long labels
+    int getOptionPadding(const MenuEntryConfig& config)
+    {
+        int maxWidth = 0;
+        for (size_t i = 0; i < config.size; ++i)
+        {
+            formatOption(config.options[i]);
+            const int width = tft_.textWidth(optionBuffer_);
+            if (width > maxWidth)
+            {
+                maxWidth = width;
+            }
+        }
+        return maxWidth;
+    }
+};
+
+template<typename TFT_eSPI, typename Settings>
+SettingsMenu<TFT_eSPI, Settings>
+makeSettingsMenu(TFT_eSPI& tft, Settings settings, KeyColors menuColors)
+{
+    return SettingsMenu<TFT_eSPI, Settings>{tft, settings, menuColors};
 }
