@@ -1284,28 +1284,18 @@ private:
         tft_.setTextColor(labelColor_,
                           selected ? selectedColor_ : unSelectedColor_);
         tft_.setTextDatum(ML_DATUM);
-        // No need for padding, labels are left-aligned and never change
-        tft_.setTextPadding(0);
+        // We want the label's padding to expand to the end of the entry's
+        // rectangle so it highlights the entire entry including the option and
+        // also to remove any artifacts from the option text when it changes.
+        const auto fullEntryWidth = rect_.width - 5 - 5; // 5px padding on sides
+        tft_.setTextPadding(fullEntryWidth);
         tft_.drawString(setting.entry.label, rect_.x0 + 5, y);
         // Draw the current config option aligned to the right
         tft_.setTextDatum(MR_DATUM);
-        tft_.setTextPadding(getOptionPadding(setting.config));
+        tft_.setTextPadding(0); // Label handles artifacts & highlighting
         formatOption(setting.config.options[setting.config.currentIndex]);
-        if (selected)
-        {
-            // Let's get rid of artifacts
-            // TODO: Think something smarter but still simple
-            tft_.setTextColor(labelColor_, unSelectedColor_);
-            tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
-            tft_.setTextColor(labelColor_, selectedColor_);
-            tft_.setTextPadding(0); // 0 padding, by now we got rid of artifacts
-            tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
-        }
-        else
-        {
-            tft_.setTextColor(labelColor_, unSelectedColor_);
-            tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
-        }
+        tft_.setTextColor(labelColor_); // Label handles highlighting
+        tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
     }
 
     void formatOption(const char* option)
