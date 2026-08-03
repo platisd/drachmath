@@ -1186,6 +1186,7 @@ private:
         if (selected)
         {
             // Let's get rid of artifacts
+            // TODO: Think something smarter but still simple
             tft_.setTextColor(labelColor_, unSelectedColor_);
             tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
             tft_.setTextColor(labelColor_, selectedColor_);
