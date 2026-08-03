@@ -7,8 +7,9 @@ const TftColor screenBackgroundColor = colors::Red;
 auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 2);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
-auto mathsQuiz
-    = makeMathsQuiz(tft, colors::Red, colors::White, mathsQuizListeners);
+SettingsHolder settingsHolder{};
+auto mathsQuiz = makeMathsQuiz(
+    tft, colors::Red, colors::White, mathsQuizListeners, settingsHolder);
 auto keyListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
 auto keyLabels
@@ -35,15 +36,20 @@ const KeyColors menuColors
     = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto settingsEntries = makeSettingsEntries(
     SettingsEntry{MenuEntry{"Max operand value"},
-                  makeMenuEntryConfig("10", "100")},
+                  makeMenuEntryConfig("10", "100"),
+                  [](auto v) { settingsHolder.setMaxOperand(v); }},
     SettingsEntry{MenuEntry{"Max result value"},
-                  makeMenuEntryConfig("10", "100", "1000")},
+                  makeMenuEntryConfig("10", "100", "1000"),
+                  [](auto v) { settingsHolder.setMaxResult(v); }},
     SettingsEntry{MenuEntry{"Math operations"},
-                  makeMenuEntryConfig("+", "+-", "+-*", "+-*/")},
+                  makeMenuEntryConfig("+", "+-", "+-*", "+-*/"),
+                  [](auto v) { settingsHolder.setOperationsCount(v); }},
     SettingsEntry{MenuEntry{"Language"},
-                  makeMenuEntryConfig("Greek", "English")},
+                  makeMenuEntryConfig("Greek", "English"),
+                  [](auto v) { settingsHolder.setLanguage(v); }},
     SettingsEntry{MenuEntry{"Max word length"},
-                  makeMenuEntryConfig("5", "10", "15")});
+                  makeMenuEntryConfig("5", "10", "15"),
+                  [](auto v) { settingsHolder.setMaxWordLength(v); }});
 
 auto settingsMenu = makeSettingsMenu(tft, settingsEntries, menuColors);
 

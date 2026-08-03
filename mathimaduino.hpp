@@ -394,18 +394,20 @@ struct MathsQuestion
 
 /// The MathsQuiz class is responsible for managing the maths quiz logic, i.e.
 /// generating the (current and next) questions and checking the answers
-template<typename TFT_eSPI, typename Listeners>
+template<typename TFT_eSPI, typename Listeners, typename SettingsHolderT>
 class MathsQuiz
 {
 public:
     MathsQuiz(TFT_eSPI& tft,
               TftColor backgroundColor,
               TftColor textColor,
-              Listeners listeners)
+              Listeners listeners,
+              SettingsHolderT& settingsHolder)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
         , listeners_{listeners}
+        , settingsHolder_{settingsHolder}
     {
     }
 
@@ -529,12 +531,12 @@ private:
     int32_t backgroundColor_;
     int32_t textColor_;
     Listeners listeners_;
+    SettingsHolderT& settingsHolder_;
     RectangleDimensions rect_{};
     int currentCorrectAnswer_{};
     bool enabled_{false};
 
     constexpr static int minOperand               = 1;
-    constexpr static int maxOperand               = 100;
     constexpr static unsigned long operationsSize = 4;
     const char operations[operationsSize]         = {'+', '-', '*', '/'};
     /// Enough to contain something like "nnn + nnn = nnnnn" + null terminator
@@ -544,9 +546,24 @@ private:
 
     MathsQuestion generateQuestion()
     {
+        for (int attempt{0}; attempt < 1000; ++attempt)
+        {
+            MathsQuestion question = generateQuestionHelper();
+            if (question.answer <= settingsHolder_.getMaxResult())
+            {
+                return question;
+            }
+        }
+        return MathsQuestion{1, 1, '+', 2}; // Fallback
+    }
+
+    MathsQuestion generateQuestionHelper()
+    {
+        int maxOperand = settingsHolder_.getMaxOperand();
         int operand1   = random(minOperand, maxOperand + 1);
         int operand2   = random(minOperand, maxOperand + 1);
-        char operation = operations[random(0, operationsSize)];
+        char operation
+            = operations[random(0, settingsHolder_.getOperationsCount())];
         switch (operation)
         {
         case '+':
@@ -575,14 +592,16 @@ private:
     }
 };
 
-template<typename TFT_eSPI, typename Listeners>
-MathsQuiz<TFT_eSPI, Listeners> makeMathsQuiz(TFT_eSPI& tft,
-                                             TftColor backgroundColor,
-                                             TftColor textColor,
-                                             Listeners listeners)
+template<typename TFT_eSPI, typename Listeners, typename SettingsHolderT>
+MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>
+makeMathsQuiz(TFT_eSPI& tft,
+              TftColor backgroundColor,
+              TftColor textColor,
+              Listeners listeners,
+              SettingsHolderT& settingsHolder)
 {
-    return MathsQuiz<TFT_eSPI, Listeners>{
-        tft, backgroundColor, textColor, listeners};
+    return MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>{
+        tft, backgroundColor, textColor, listeners, settingsHolder};
 }
 
 template<typename TFT_eSPI>
@@ -1013,16 +1032,25 @@ constexpr MenuEntryConfig makeMenuEntryConfig(Options... options)
     return MenuEntryConfig{{options...}, sizeof...(Options), 0};
 }
 
+/// Knows how to convert
+using SettingsLogger = void (*)(const char* value);
+
 struct SettingsEntry
 {
-    SettingsEntry(MenuEntry entry, MenuEntryConfig config)
+    SettingsEntry(MenuEntry entry,
+                  MenuEntryConfig config,
+                  SettingsLogger logger)
         : entry{entry}
         , config{config}
+        , log{logger}
     {
+        // Ensure the settings holder is initialized with a default value
+        log(config.options[config.currentIndex]);
     }
 
     MenuEntry entry;
     MenuEntryConfig config;
+    SettingsLogger log;
 };
 
 template<typename... Entries>
@@ -1041,6 +1069,84 @@ constexpr SettingsEntries<Entries...> makeSettingsEntries(Entries... entries)
 {
     return SettingsEntries<Entries...>{entries...};
 }
+
+enum class Language
+{
+    Greek,
+    English
+};
+
+// Creating a generic SettingsHolder was a fun excercise but let's
+// keep it simple and implement one that is purpose-specific and encapsulates
+// all relevant conversion logic.
+class SettingsHolder
+{
+public:
+    int getMaxOperand() const
+    {
+        return maxOperandValue_;
+    }
+
+    void setMaxOperand(const char* value)
+    {
+        maxOperandValue_ = atoi(value);
+    }
+
+    int getMaxResult() const
+    {
+        return maxResultValue_;
+    }
+
+    void setMaxResult(const char* value)
+    {
+        maxResultValue_ = atoi(value);
+    }
+
+    int getOperationsCount() const
+    {
+        return operationsCount_;
+    }
+
+    void setOperationsCount(const char* value)
+    {
+        // Assuming value is a string of operations like "+-*/"
+        operationsCount_ = strlen(value);
+    }
+
+    Language getLanguage() const
+    {
+        return language_;
+    }
+
+    void setLanguage(const char* value)
+    {
+        if (strcmp(value, "Greek") == 0)
+        {
+            language_ = Language::Greek;
+        }
+        else
+        {
+            language_ = Language::English;
+        }
+    }
+
+    int getMaxWordLength() const
+    {
+        return maxWordLength_;
+    }
+
+    void setMaxWordLength(const char* value)
+    {
+        maxWordLength_ = atoi(value);
+    }
+
+private:
+    int maxOperandValue_{};
+    int maxResultValue_{};
+    int operationsCount_{};
+    Language language_{};
+    int maxWordLength_{};
+};
 
 template<typename TFT_eSPI, typename Settings>
 class SettingsMenu
@@ -1104,8 +1210,10 @@ public:
         {
             return;
         }
-        int previousIndex  = selectedIndex_;
-        bool configChanged = false;
+        int previousIndex   = selectedIndex_;
+        bool configChanged  = false;
+        auto& currentEntry  = settings_.entries[selectedIndex_];
+        auto& currentConfig = currentEntry.config;
         switch (event)
         {
         case NavigationEvent::Up:
@@ -1117,17 +1225,17 @@ public:
             break;
         case NavigationEvent::Left:
             // Wrap around to the last option if at the first
-            settings_.entries[selectedIndex_].config.currentIndex
-                = (settings_.entries[selectedIndex_].config.currentIndex - 1
-                   + settings_.entries[selectedIndex_].config.size)
-                  % settings_.entries[selectedIndex_].config.size;
+            currentConfig.currentIndex
+                = (currentConfig.currentIndex - 1 + currentConfig.size)
+                  % currentConfig.size;
             configChanged = true;
+            currentEntry.log(currentConfig.options[currentConfig.currentIndex]);
             break;
         case NavigationEvent::Right:
             // Wrap around to the first option if at the last
-            settings_.entries[selectedIndex_].config.currentIndex
-                = (settings_.entries[selectedIndex_].config.currentIndex + 1)
-                  % settings_.entries[selectedIndex_].config.size;
+            currentConfig.currentIndex
+                = (currentConfig.currentIndex + 1) % currentConfig.size;
+            currentEntry.log(currentConfig.options[currentConfig.currentIndex]);
             configChanged = true;
             break;
         default:
