@@ -611,7 +611,7 @@ public:
     Label(TFT_eSPI& tft,
           TftColor backgroundColor,
           TftColor textColor,
-          int textSize = 1)
+          int textSize)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
@@ -628,7 +628,8 @@ public:
     {
         tft_.setTextColor(textColor_, backgroundColor_);
         tft_.setTextSize(textSize_);
-        tft_.setTextPadding(tft_.width() / 9);
+        tft_.setTextPadding(0);
+        tft_.setTextDatum(MC_DATUM);
         tft_.drawString(label, point_.x, point_.y);
     }
 
@@ -644,7 +645,7 @@ template<typename TFT_eSPI>
 Label<TFT_eSPI> makeLabel(TFT_eSPI& tft,
                           TftColor backgroundColor,
                           TftColor textColor,
-                          int textSize = 1)
+                          int textSize)
 {
     return Label<TFT_eSPI>{tft, backgroundColor, textColor, textSize};
 }

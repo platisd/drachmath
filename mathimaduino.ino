@@ -4,7 +4,7 @@
 TFT_eSPI tft;
 
 const TftColor screenBackgroundColor = colors::Red;
-auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 2);
+auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 3);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
 SettingsHolder settingsHolder{};
@@ -17,9 +17,9 @@ auto keyLabels
 const KeyColors keyColors
     = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
-auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White);
-auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White);
-auto rightButtonLabel  = makeLabel(tft, colors::Black, colors::White);
+auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White, 2);
+auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White, 2);
+auto rightButtonLabel  = makeLabel(tft, colors::Black, colors::White, 2);
 RectangleDimensions
     screenAreaExcludingButtonLabels{}; // Will be initialized in setup()
 const auto clearScreenExcludingButtonLabels = []
@@ -183,19 +183,19 @@ void setup()
     tft.fillScreen(makeColor(screenBackgroundColor));
     // the button labels are on the top left of the screen and are a few pixels
     // large. They are roughly 10% of the screen away from each o ther
-    leftButtonLabel.begin({tft.width() * 0.055F, 0});
+    leftButtonLabel.begin({tft.width() * 0.045F, 0});
     leftButtonLabel.draw("OK");
     middleButtonLabel.begin({tft.width() * 0.28F, 0});
-    middleButtonLabel.draw("<");
-    rightButtonLabel.begin({tft.width() * 0.55F, 0});
-    rightButtonLabel.draw("X");
+    middleButtonLabel.draw("Del");
+    rightButtonLabel.begin({tft.width() * 0.54F, 0});
+    rightButtonLabel.draw("Esc");
     scoreLabel.begin({tft.width(), 0});
     scoreKeeper.draw();
     screenAreaExcludingButtonLabels
         = {0,
-           20, // Roughly the height of the button labels
+           25, // Roughly the height of the button labels
            tft.width(),
-           tft.height() - 20, // Roughly the height of the button labels
+           tft.height() - 25, // Roughly the height of the button labels
            0};
     const RectangleDimensions menuInTheMiddle{tft.width() / 5.5F,
                                               tft.height() / 5.0F,
