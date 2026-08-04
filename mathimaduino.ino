@@ -43,7 +43,7 @@ auto settingsEntries = makeSettingsEntries(
                   makeMenuEntryConfig("10", "100"),
                   [](auto v) { settingsHolder.setMaxOperand(v); }},
     SettingsEntry{MenuEntry{"Max result value"},
-                  makeMenuEntryConfig("10", "100", "1000"),
+                  makeMenuEntryConfig("10", "100", "1000", "10000"),
                   [](auto v) { settingsHolder.setMaxResult(v); }},
     SettingsEntry{MenuEntry{"Math operations"},
                   makeMenuEntryConfig("+", "+-", "+-*", "+-*/"),
