@@ -4,7 +4,8 @@
 TFT_eSPI tft;
 
 const TftColor screenBackgroundColor = colors::Red;
-auto scoreLabel         = makeLabel(tft, colors::Black, colors::White, 3);
+auto scoreLabel
+    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 3);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
 SettingsHolder settingsHolder{};
@@ -17,9 +18,12 @@ auto keyLabels
 const KeyColors keyColors
     = {colors::White, colors::Black, colors::Green, colors::Gray};
 auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
-auto leftButtonLabel   = makeLabel(tft, colors::Black, colors::White, 2);
-auto middleButtonLabel = makeLabel(tft, colors::Black, colors::White, 2);
-auto rightButtonLabel  = makeLabel(tft, colors::Black, colors::White, 2);
+auto leftButtonLabel
+    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
+auto middleButtonLabel
+    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
+auto rightButtonLabel
+    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
 RectangleDimensions
     screenAreaExcludingButtonLabels{}; // Will be initialized in setup()
 const auto clearScreenExcludingButtonLabels = []
@@ -71,6 +75,8 @@ auto mainMenuEntries = makeMenuEntries(
                 0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
             mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
             mathsQuiz.drawNewQuestion();
+            middleButtonLabel.draw("Del");
+            rightButtonLabel.draw("Esc");
             return false; // Disable the main menu since we are now in the quiz
         }},
     MenuEntry{"Spelling Quiz"},
@@ -87,6 +93,9 @@ auto mainMenuEntries = makeMenuEntries(
                 5};
             settingsMenu.begin(settingsMenuLargeInTheMiddle);
             settingsMenu.draw();
+            leftButtonLabel.clear(); // Nothing to select with button
+            middleButtonLabel.clear();
+            rightButtonLabel.draw("Esc");
             return false; // Disable the main menu since we are now in settings
         }},
     MenuEntry{"About"});
@@ -106,6 +115,9 @@ auto buttonListeners = makeButtonListeners(
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();
+            leftButtonLabel.draw("Sel");
+            middleButtonLabel.clear(); // Button not used in main menu
+            rightButtonLabel.clear();
         }
     },
     [](ButtonEvent event)
@@ -116,6 +128,9 @@ auto buttonListeners = makeButtonListeners(
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();
+            leftButtonLabel.draw("Sel");
+            middleButtonLabel.clear();
+            rightButtonLabel.clear();
         }
     },
     [](ButtonEvent event) { mainMenu.handleButtonEvent(event); });
@@ -184,11 +199,9 @@ void setup()
     // the button labels are on the top left of the screen and are a few pixels
     // large. They are roughly 10% of the screen away from each o ther
     leftButtonLabel.begin({tft.width() * 0.045F, 0});
-    leftButtonLabel.draw("OK");
+    leftButtonLabel.draw("Sel");
     middleButtonLabel.begin({tft.width() * 0.28F, 0});
-    middleButtonLabel.draw("Del");
     rightButtonLabel.begin({tft.width() * 0.54F, 0});
-    rightButtonLabel.draw("Esc");
     scoreLabel.begin({tft.width(), 0});
     scoreKeeper.draw();
     screenAreaExcludingButtonLabels

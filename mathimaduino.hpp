@@ -76,6 +76,12 @@ inline void adjustOperandsForPerfectDivision(int& a, int& b)
     }
 }
 
+template<typename T>
+constexpr T clamp0(T value)
+{
+    return value < 0 ? 0 : value;
+}
+
 namespace colors
 {
 constexpr TftColor Black{0, 0, 0};
@@ -611,10 +617,12 @@ public:
     Label(TFT_eSPI& tft,
           TftColor backgroundColor,
           TftColor textColor,
+          TftColor clearColor,
           int textSize)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
+        , clearColor_{makeColor(clearColor)}
         , textSize_{textSize}
     {
     }
@@ -624,6 +632,21 @@ public:
         point_ = point;
     }
 
+    void clear()
+    {
+        if (labelBuffer_[0] == '\0')
+        {
+            return;
+        }
+        tft_.setTextSize(textSize_);
+        int textWidth  = tft_.textWidth(labelBuffer_);
+        int textHeight = tft_.fontHeight() * textSize_;
+        int x0         = clamp0(point_.x - textWidth / 2);
+        int y0         = clamp0(point_.y - textHeight / 2);
+        tft_.fillRect(x0, y0, textWidth, textHeight, clearColor_);
+        labelBuffer_[0] = '\0';
+    }
+
     void draw(const char* label)
     {
         tft_.setTextColor(textColor_, backgroundColor_);
@@ -631,23 +654,30 @@ public:
         tft_.setTextPadding(0);
         tft_.setTextDatum(MC_DATUM);
         tft_.drawString(label, point_.x, point_.y);
+        strncpy(labelBuffer_, label, maxLabelLength - 1);
+        labelBuffer_[maxLabelLength - 1] = '\0';
     }
 
 private:
     TFT_eSPI& tft_;
     int32_t backgroundColor_;
     int32_t textColor_;
+    int32_t clearColor_;
     int textSize_;
     Point point_{};
+    constexpr static size_t maxLabelLength = 5;
+    char labelBuffer_[maxLabelLength]      = {'\0'};
 };
 
 template<typename TFT_eSPI>
 Label<TFT_eSPI> makeLabel(TFT_eSPI& tft,
                           TftColor backgroundColor,
                           TftColor textColor,
+                          TftColor clearColor,
                           int textSize)
 {
-    return Label<TFT_eSPI>{tft, backgroundColor, textColor, textSize};
+    return Label<TFT_eSPI>{
+        tft, backgroundColor, textColor, clearColor, textSize};
 }
 
 template<typename Lbl, typename TFT_eSPI>
