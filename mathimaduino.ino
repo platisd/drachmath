@@ -1,4 +1,10 @@
+#include <SPI.h>
+#include <Seeed_FS.h>
+
+#include "SD/Seeed_SD.h"
+
 #include "TFT_eSPI.h"
+
 #include "mathimaduino.hpp"
 
 TFT_eSPI tft;
@@ -41,21 +47,28 @@ const KeyColors menuColors
 auto settingsEntries = makeSettingsEntries(
     SettingsEntry{MenuEntry{"Max operand value"},
                   makeMenuEntryConfig("10", "100"),
+                  "max_operand.txt",
                   [](auto v) { settingsHolder.setMaxOperand(v); }},
     SettingsEntry{MenuEntry{"Max result value"},
                   makeMenuEntryConfig("10", "100", "1000", "10000"),
+                  "max_result.txt",
                   [](auto v) { settingsHolder.setMaxResult(v); }},
     SettingsEntry{MenuEntry{"Math operations"},
                   makeMenuEntryConfig("+", "+-", "+-*", "+-*/"),
+                  "operations_count.txt",
                   [](auto v) { settingsHolder.setOperationsCount(v); }},
     SettingsEntry{MenuEntry{"Language"},
                   makeMenuEntryConfig("Greek", "English"),
+                  "language.txt",
                   [](auto v) { settingsHolder.setLanguage(v); }},
     SettingsEntry{MenuEntry{"Max word length"},
                   makeMenuEntryConfig("5", "10", "15"),
+                  "max_word_length.txt",
                   [](auto v) { settingsHolder.setMaxWordLength(v); }});
 
 auto settingsMenu = makeSettingsMenu(tft, settingsEntries, menuColors);
+auto persistentSettings
+    = makePersistentSettings(settingsHolder, SD, settingsEntries);
 
 auto mainMenuEntries = makeMenuEntries(
     MenuEntry{
@@ -125,6 +138,7 @@ auto buttonListeners = makeButtonListeners(
         const auto shouldExit = settingsMenu.handleButtonEvent(event);
         if (shouldExit)
         {
+            persistentSettings.save();
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();
@@ -191,6 +205,15 @@ void setup()
     pinMode(WIO_BUZZER, OUTPUT);
     attachInterrupts();
     Serial.begin(115200);
+    while (!Serial)
+    {
+    }
+    if (!SD.begin(SDCARD_SS_PIN, SDCARD_SPI))
+    {
+        Serial.println("SD initialization failed!");
+        // TODO: Do something more useful
+    }
+    persistentSettings.load();
 
     tft.begin();
     tft.setRotation(3);

@@ -1070,9 +1070,11 @@ struct SettingsEntry
 {
     SettingsEntry(MenuEntry entry,
                   MenuEntryConfig config,
+                  const char* persistentFilePath,
                   SettingsLogger logger)
         : entry{entry}
         , config{config}
+        , persistentFilePath{persistentFilePath}
         , log{logger}
     {
         // Ensure the settings holder is initialized with a default value
@@ -1081,6 +1083,7 @@ struct SettingsEntry
 
     MenuEntry entry;
     MenuEntryConfig config;
+    const char* persistentFilePath;
     SettingsLogger log;
 };
 
@@ -1140,6 +1143,12 @@ public:
 
     void setOperationsCount(const char* value)
     {
+        int maybeCount = atoi(value);
+        if (maybeCount > 0) // 0 or negative are not valid counts
+        {
+            operationsCount_ = maybeCount;
+            return;
+        }
         // Assuming value is a string of operations like "+-*/"
         operationsCount_ = strlen(value);
     }
@@ -1151,13 +1160,17 @@ public:
 
     void setLanguage(const char* value)
     {
-        if (strcmp(value, "Greek") == 0)
+        if (strcmp(value, "Greek") == 0 || strcmp(value, "0") == 0)
         {
             language_ = Language::Greek;
         }
-        else
+        else if (strcmp(value, "English") == 0 || strcmp(value, "1") == 0)
         {
             language_ = Language::English;
+        }
+        else
+        {
+            language_ = Language::Greek;
         }
     }
 
@@ -1183,7 +1196,7 @@ template<typename TFT_eSPI, typename Settings>
 class SettingsMenu
 {
 public:
-    SettingsMenu(TFT_eSPI& tft, Settings settings, KeyColors menuColors)
+    SettingsMenu(TFT_eSPI& tft, Settings& settings, KeyColors menuColors)
         : tft_{tft}
         , settings_{settings}
         , labelColor_{makeColor(menuColors.label)}
@@ -1296,7 +1309,7 @@ public:
 
 private:
     TFT_eSPI& tft_;
-    Settings settings_;
+    Settings& settings_;
     int32_t labelColor_;
     int32_t unSelectedColor_;
     int32_t selectedColor_;
@@ -1356,7 +1369,207 @@ private:
 
 template<typename TFT_eSPI, typename Settings>
 SettingsMenu<TFT_eSPI, Settings>
-makeSettingsMenu(TFT_eSPI& tft, Settings settings, KeyColors menuColors)
+makeSettingsMenu(TFT_eSPI& tft, Settings& settings, KeyColors menuColors)
 {
     return SettingsMenu<TFT_eSPI, Settings>{tft, settings, menuColors};
+}
+
+template<typename OnDestroy>
+class ScopedDestructor
+{
+public:
+    ScopedDestructor(OnDestroy onDestroy)
+        : onDestroy_{onDestroy}
+    {
+    }
+
+    ScopedDestructor(const ScopedDestructor&)            = delete;
+    ScopedDestructor& operator=(const ScopedDestructor&) = delete;
+    // We need this move constructor to allow returning a ScopedDestructor from
+    // a function, i.e. makeScopedDestructor This wouldn't be needed if we used
+    // a standard with proper copy elision and/or CTAD
+    ScopedDestructor(ScopedDestructor&& other) noexcept
+        : onDestroy_{other.onDestroy_}
+        , active_{other.active_}
+    {
+        other.active_ = false;
+    }
+
+    ~ScopedDestructor()
+    {
+        if (active_)
+        {
+            onDestroy_();
+        }
+    }
+
+private:
+    OnDestroy onDestroy_;
+    bool active_{true};
+};
+
+template<typename OnDestroy>
+ScopedDestructor<OnDestroy> makeScopedDestructor(OnDestroy onDestroy)
+{
+    return ScopedDestructor<OnDestroy>{onDestroy};
+}
+
+template<typename FileSystem>
+class FileWriter
+{
+public:
+    FileWriter(const char* filename, FileSystem& fs)
+        : filename_{filename}
+        , fs_{fs}
+    {
+    }
+
+    template<typename T>
+    void print(const T& data)
+    {
+        auto file      = fs_.open(filename_, 0x0B /* FILE_WRITE */);
+        auto closeFile = makeScopedDestructor(
+            [&file]
+            {
+                if (file)
+                {
+                    file.close();
+                }
+            });
+        if (file)
+        {
+            file.print(data);
+        }
+    }
+
+private:
+    const char* filename_;
+    FileSystem& fs_;
+};
+
+template<typename FileSystem>
+FileWriter<FileSystem> makeFileWriter(const char* filename, FileSystem& fs)
+{
+    return FileWriter<FileSystem>{filename, fs};
+}
+
+template<typename FileSystem, size_t BufferSize>
+class FileReader
+{
+    static_assert(BufferSize >= 2, "Need room for a character and a NULL");
+
+public:
+    FileReader(const char* filename, FileSystem& fs)
+        : filename_{filename}
+        , fs_{fs}
+    {
+    }
+
+    const char* readLine()
+    {
+        auto file      = fs_.open(filename_, 1 /* FILE_READ */);
+        auto closeFile = makeScopedDestructor(
+            [&file]
+            {
+                if (file)
+                {
+                    file.close();
+                }
+            });
+
+        if (!file || !file.available())
+        {
+            return nullptr;
+        }
+        size_t length = 0;
+        while (file.available() && length < BufferSize - 1)
+        {
+            const auto c = file.read();
+            if (c == '\n')
+            {
+                break;
+            }
+            buffer_[length++] = static_cast<char>(c);
+        }
+        while (length > 0 && buffer_[length - 1] == '\r')
+        {
+            --length;
+        }
+        buffer_[length] = '\0';
+        return buffer_;
+    }
+
+private:
+    const char* filename_;
+    FileSystem& fs_;
+    char buffer_[BufferSize]{'\0'};
+};
+
+template<typename FileSystem, size_t BufferSize>
+FileReader<FileSystem, BufferSize> makeFileReader(const char* filename,
+                                                  FileSystem& fs)
+{
+    return FileReader<FileSystem, BufferSize>{filename, fs};
+}
+
+template<typename SettingsHolderT, typename FileSystem, typename Settings>
+class PersistentSettings
+{
+public:
+    PersistentSettings(SettingsHolderT& settingsHolder,
+                       FileSystem& fs,
+                       Settings& settings)
+        : settingsHolder_{settingsHolder}
+        , fs_{fs}
+        , settings_{settings}
+    {
+    }
+
+    void save()
+    {
+        for (auto& entry : settings_.entries)
+        {
+            auto writer = makeFileWriter(entry.persistentFilePath, fs_);
+            writer.print(entry.config.options[entry.config.currentIndex]);
+        }
+    }
+
+    void load()
+    {
+        for (auto& entry : settings_.entries)
+        {
+            auto reader
+                = makeFileReader<FileSystem, 16>(entry.persistentFilePath, fs_);
+            auto value = reader.readLine();
+            if (!value)
+            {
+                continue;
+            }
+            // Update the index of the config to match the loaded value
+            for (size_t i = 0; i < entry.config.size; ++i)
+            {
+                if (strcmp(value, entry.config.options[i]) == 0)
+                {
+                    entry.config.currentIndex = i;
+                    entry.log(value);
+                    break;
+                }
+            }
+        }
+    }
+
+private:
+    SettingsHolderT& settingsHolder_;
+    FileSystem& fs_;
+    Settings& settings_;
+};
+
+template<typename SettingsHolderT, typename FileSystem, typename Settings>
+PersistentSettings<SettingsHolderT, FileSystem, Settings>
+makePersistentSettings(SettingsHolderT& settingsHolder,
+                       FileSystem& fs,
+                       Settings& settings)
+{
+    return PersistentSettings<SettingsHolderT, FileSystem, Settings>{
+        settingsHolder, fs, settings};
 }
