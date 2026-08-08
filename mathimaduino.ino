@@ -205,9 +205,6 @@ void setup()
     pinMode(WIO_BUZZER, OUTPUT);
     attachInterrupts();
     Serial.begin(115200);
-    while (!Serial)
-    {
-    }
     if (!SD.begin(SDCARD_SS_PIN, SDCARD_SPI))
     {
         Serial.println("SD initialization failed!");
