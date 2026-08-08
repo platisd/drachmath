@@ -1424,6 +1424,17 @@ public:
     {
     }
 
+    bool test()
+    {
+        auto file = fs_.open(filename_, 0x0B /* FILE_WRITE */);
+        if (!file)
+        {
+            return false;
+        }
+        file.close();
+        return true;
+    }
+
     template<typename T>
     void print(const T& data)
     {
@@ -1572,4 +1583,82 @@ makePersistentSettings(SettingsHolderT& settingsHolder,
 {
     return PersistentSettings<SettingsHolderT, FileSystem, Settings>{
         settingsHolder, fs, settings};
+}
+
+/// Returns true if SD card initialized successfully, false otherwise
+using SdCardInitializer = bool (*)();
+/// Returns true if SD card is present, false otherwise
+using SdCardPresentDetector = bool (*)();
+
+template<typename TestFileWriter>
+class SdCardChecker
+{
+public:
+    SdCardChecker(TestFileWriter testFileWriter,
+                  SdCardInitializer sdCardInitializer,
+                  SdCardPresentDetector sdCardPresentDetector)
+        : testFileWriter_{testFileWriter}
+        , initializeSdCard_{sdCardInitializer}
+        , isSdCardPresent_{sdCardPresentDetector}
+    {
+    }
+
+    // Called in setup()
+    void begin()
+    {
+        handleSdCardActivity(true);
+    }
+
+    // Called in loop()
+    void handleSdCardActivity(bool forceCheck = false)
+    {
+        const auto currentTime = millis();
+        if (!forceCheck && currentTime - lastCheckTime_ < debounceDelay_)
+        {
+            return;
+        }
+        lastCheckTime_ = currentTime;
+        auto present   = isSdCardPresent_();
+        if (present == sdCardPresent_)
+        {
+            return; // No change in SD card presence
+        }
+        sdCardPresent_ = present;
+        if (!sdCardPresent_)
+        {
+            sdCardReadyToUse_ = false;
+            return;
+        }
+        // If we can write to the SD card then we are good to go, no re-init
+        if (testFileWriter_.test())
+        {
+            sdCardReadyToUse_ = true;
+            return;
+        }
+        sdCardReadyToUse_ = initializeSdCard_();
+    }
+
+    bool isSdCardReadyToUse() const
+    {
+        return sdCardReadyToUse_;
+    }
+
+private:
+    TestFileWriter testFileWriter_;
+    SdCardInitializer initializeSdCard_;
+    SdCardPresentDetector isSdCardPresent_;
+    bool sdCardPresent_{false};
+    bool sdCardReadyToUse_{false};
+    unsigned long lastCheckTime_{0};
+    constexpr static unsigned long debounceDelay_{333}; // milliseconds
+};
+
+template<typename TestFileWriter>
+SdCardChecker<TestFileWriter>
+makeSdCardChecker(TestFileWriter testFileWriter,
+                  SdCardInitializer sdCardInitializer,
+                  SdCardPresentDetector sdCardPresentDetector)
+{
+    return SdCardChecker<TestFileWriter>{
+        testFileWriter, sdCardInitializer, sdCardPresentDetector};
 }

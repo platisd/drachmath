@@ -9,6 +9,19 @@
 
 TFT_eSPI tft;
 
+void warnNoSdCard(int x0,
+                  int y0,
+                  int textSize,
+                  int alignment,
+                  TftColor textColor,
+                  TftColor backgroundColor)
+{
+    tft.setTextColor(makeColor(textColor), makeColor(backgroundColor));
+    tft.setTextSize(textSize);
+    tft.setTextDatum(alignment);
+    tft.drawString("No SD card: Will lose settings on power off", x0, y0);
+}
+
 const TftColor screenBackgroundColor = colors::Red;
 auto scoreLabel
     = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 3);
@@ -69,6 +82,10 @@ auto settingsEntries = makeSettingsEntries(
 auto settingsMenu = makeSettingsMenu(tft, settingsEntries, menuColors);
 auto persistentSettings
     = makePersistentSettings(settingsHolder, SD, settingsEntries);
+auto sdCardChecker = makeSdCardChecker(
+    makeFileWriter("sd_card_test.txt", SD),
+    [] { return SD.begin(SDCARD_SS_PIN, SDCARD_SPI); },
+    [] { return digitalRead(SDCARD_DET_PIN) == LOW; });
 
 auto mainMenuEntries = makeMenuEntries(
     MenuEntry{
@@ -109,15 +126,20 @@ auto mainMenuEntries = makeMenuEntries(
             leftButtonLabel.clear(); // Nothing to select with button
             middleButtonLabel.clear();
             rightButtonLabel.draw("Esc");
+            if (!sdCardChecker.isSdCardReadyToUse())
+            {
+                warnNoSdCard(tft.width() / 2,
+                             tft.height(),
+                             1,
+                             TC_DATUM,
+                             colors::Black,
+                             screenBackgroundColor);
+            }
             return false; // Disable the main menu since we are now in settings
         }},
     MenuEntry{"About"});
 auto mainMenu = makeMenu(tft, mainMenuEntries, menuColors);
 
-auto navigationListeners = makeNavigationListeners(
-    [](NavigationEvent event) { keyboard.handleNavigationEvent(event); },
-    [](NavigationEvent event) { settingsMenu.handleNavigationEvent(event); },
-    [](NavigationEvent event) { mainMenu.handleNavigationEvent(event); });
 auto buttonListeners = makeButtonListeners(
     [](ButtonEvent event)
     {
@@ -138,7 +160,10 @@ auto buttonListeners = makeButtonListeners(
         const auto shouldExit = settingsMenu.handleButtonEvent(event);
         if (shouldExit)
         {
-            persistentSettings.save();
+            if (sdCardChecker.isSdCardReadyToUse())
+            {
+                persistentSettings.save();
+            }
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();
@@ -148,6 +173,11 @@ auto buttonListeners = makeButtonListeners(
         }
     },
     [](ButtonEvent event) { mainMenu.handleButtonEvent(event); });
+
+auto navigationListeners = makeNavigationListeners(
+    [](NavigationEvent event) { keyboard.handleNavigationEvent(event); },
+    [](NavigationEvent event) { settingsMenu.handleNavigationEvent(event); },
+    [](NavigationEvent event) { mainMenu.handleNavigationEvent(event); });
 auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
 
 void attachInterrupts()
@@ -172,15 +202,8 @@ void attachInterrupts()
         digitalPinToInterrupt(WIO_5S_PRESS),
         [] { inputHandler.updateNavigationEvent(NavigationEvent::Press); },
         RISING);
-    // Cannot attach an interrupt to both WIO_KEY_A and WIO_5S_UP
-    // as they share the same external interrupt line. Poll instead.
-    // attachInterrupt(
-    //     digitalPinToInterrupt(WIO_KEY_A),
-    //     []
-    //     {
-    //         inputHandler.updateButtonEvent(ButtonEvent::Right);
-    //     },
-    //     RISING);
+    // WIO_KEY_A and WIO_5S_UP interrupt clash
+    // WIO_KEY_B and SDCARD_DET_PIN interrupt clash
     attachInterrupt(
         digitalPinToInterrupt(WIO_KEY_B),
         [] { inputHandler.updateButtonEvent(ButtonEvent::Middle); },
@@ -202,15 +225,15 @@ void setup()
     pinMode(WIO_KEY_A, INPUT_PULLUP);
     pinMode(WIO_KEY_B, INPUT_PULLUP);
     pinMode(WIO_KEY_C, INPUT_PULLUP);
+    pinMode(SDCARD_DET_PIN, INPUT_PULLUP);
     pinMode(WIO_BUZZER, OUTPUT);
     attachInterrupts();
     Serial.begin(115200);
-    if (!SD.begin(SDCARD_SS_PIN, SDCARD_SPI))
+    sdCardChecker.begin();
+    if (sdCardChecker.isSdCardReadyToUse())
     {
-        Serial.println("SD initialization failed!");
-        // TODO: Do something more useful
+        persistentSettings.load();
     }
-    persistentSettings.load();
 
     tft.begin();
     tft.setRotation(3);
@@ -242,4 +265,5 @@ void setup()
 void loop()
 {
     inputHandler.handleEvents();
+    sdCardChecker.handleSdCardActivity();
 }
