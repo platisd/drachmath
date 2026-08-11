@@ -1712,3 +1712,291 @@ makeSdCardChecker(TestFileWriter testFileWriter,
     return SdCardChecker<TestFileWriter>{
         testFileWriter, sdCardInitializer, sdCardPresentDetector};
 }
+
+enum class GreekSpellingProblemType : uint8_t
+{
+    None,
+    Vowel,
+    Diphthong,
+    DoubleConsonant,
+    Digraph
+};
+
+namespace greek
+{
+constexpr uint16_t alpha{u'α'};
+constexpr uint16_t beta{u'β'};
+constexpr uint16_t gamma{u'γ'};
+constexpr uint16_t epsilon{u'ε'};
+constexpr uint16_t eta{u'η'};
+constexpr uint16_t iota{u'ι'};
+constexpr uint16_t kappa{u'κ'};
+constexpr uint16_t lambda{u'λ'};
+constexpr uint16_t mu{u'μ'};
+constexpr uint16_t nu{u'ν'};
+constexpr uint16_t omicron{u'ο'};
+constexpr uint16_t pi{u'π'};
+constexpr uint16_t rho{u'ρ'};
+constexpr uint16_t finalSigma{u'ς'};
+constexpr uint16_t sigma{u'σ'};
+constexpr uint16_t tau{u'τ'};
+constexpr uint16_t upsilon{u'υ'};
+constexpr uint16_t omega{u'ω'};
+
+constexpr uint16_t alphaTonos{u'ά'};
+constexpr uint16_t epsilonTonos{u'έ'};
+constexpr uint16_t etaTonos{u'ή'};
+constexpr uint16_t iotaTonos{u'ί'};
+constexpr uint16_t omicronTonos{u'ό'};
+constexpr uint16_t upsilonTonos{u'ύ'};
+constexpr uint16_t omegaTonos{u'ώ'};
+
+constexpr uint16_t iotaDialytika{u'ϊ'};
+constexpr uint16_t upsilonDialytika{u'ϋ'};
+constexpr uint16_t iotaDialytikaTonos{u'ΐ'};
+constexpr uint16_t upsilonDialytikaTonos{u'ΰ'};
+
+static_assert(alpha == 0x03B1 && omega == 0x03C9 && finalSigma == 0x03C2
+                  && iotaDialytikaTonos == 0x0390
+                  && upsilonDialytikaTonos == 0x03B0,
+              "Source file is not being compiled as UTF-8");
+} // namespace greek
+
+constexpr size_t maxGreekWordLetters{15};
+
+/// One decoded letter of a word
+struct GreekChar
+{
+    uint16_t codepoint{0};  // As it appeared in the word, e.g. ά
+    uint16_t base{0};       // Tone and final sigma folded away, e.g. α
+    uint16_t byteOffset{0}; // Where this letter starts in the original word
+    uint8_t byteLength{0};  // 2 for Greek, 1 for ASCII
+    bool accented{false};   // Carried a tonos
+    bool dialytika{false};  // Was ϊ ϋ ΐ ΰ
+};
+
+/// Reduce a codepoint to the letter it is a variant of
+inline uint16_t foldGreek(uint16_t codepoint, bool& accented, bool& dialytika)
+{
+    switch (codepoint)
+    {
+    case greek::alphaTonos:
+        accented = true;
+        return greek::alpha;
+    case greek::epsilonTonos:
+        accented = true;
+        return greek::epsilon;
+    case greek::etaTonos:
+        accented = true;
+        return greek::eta;
+    case greek::iotaTonos:
+        accented = true;
+        return greek::iota;
+    case greek::omicronTonos:
+        accented = true;
+        return greek::omicron;
+    case greek::upsilonTonos:
+        accented = true;
+        return greek::upsilon;
+    case greek::omegaTonos:
+        accented = true;
+        return greek::omega;
+    case greek::iotaDialytika:
+    case greek::iotaDialytikaTonos:
+        dialytika = true;
+        return greek::iota;
+    case greek::upsilonDialytika:
+    case greek::upsilonDialytikaTonos:
+        dialytika = true;
+        return greek::upsilon;
+    case greek::finalSigma:
+        return greek::sigma;
+    default:
+        // E.g. a capital letter, a punctuation mark etc
+        return codepoint;
+    }
+}
+
+/// Decode a UTF-8 word into letters.
+/// Returns the number of letters, or 0 if the word is longer than maxLetters
+inline size_t decodeGreekWord(const char* word,
+                              GreekChar (&letters)[maxGreekWordLetters])
+{
+    size_t count{0};
+    size_t offset{0};
+    while (word[offset] != '\0')
+    {
+        const auto lead = static_cast<uint8_t>(word[offset]);
+        uint16_t codepoint{0};
+        uint8_t byteLength{0};
+        if (lead < 0x80)
+        {
+            codepoint  = lead;
+            byteLength = 1;
+        }
+        else if ((lead & 0xE0) == 0xC0)
+        {
+            const auto next = static_cast<uint8_t>(word[offset + 1]);
+            codepoint
+                = static_cast<uint16_t>(((lead & 0x1F) << 6) | (next & 0x3F));
+            byteLength = 2;
+        }
+        else
+        {
+            // Not a one- or two-byte character, so not something a Greek word
+            // is made of. Skipping one byte resynchronises on the next lead
+            // byte.
+            ++offset;
+            continue;
+        }
+
+        if (count == maxGreekWordLetters)
+        {
+            return 0;
+        }
+
+        auto& letter     = letters[count];
+        letter.codepoint = codepoint;
+        letter.accented  = false;
+        letter.dialytika = false;
+        letter.base = foldGreek(codepoint, letter.accented, letter.dialytika);
+        letter.byteOffset = static_cast<uint16_t>(offset);
+        letter.byteLength = byteLength;
+        ++count;
+        offset += byteLength;
+    }
+    return count;
+}
+
+/// The vowels with a homophonic counterpart, so blanking one leaves a genuine
+/// choice. α is not among them: it only ever sounds like itself.
+inline bool isAmbiguousVowel(const GreekChar& letter)
+{
+    switch (letter.base)
+    {
+    case greek::epsilon: // Sounds like αι
+    case greek::omicron: // Sounds like ω
+    case greek::omega:   // Sounds like ο
+    case greek::iota:    // Sounds like η, υ, ει, οι
+    case greek::eta:     // Sounds like ι, υ, ει, οι
+    case greek::upsilon: // Sounds like ι, η, ει, οι
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// The two-letter vowel graphemes with a homophonic counterpart: αι, ει, οι,
+/// αυ and ευ. ου, υι and ηυ are deliberately not here; they have nothing to be
+/// confused with, so they fall through and are scanned as single letters.
+inline bool isVowelPair(const GreekChar& first, const GreekChar& second)
+{
+    switch (first.base)
+    {
+    case greek::alpha:   // αι, αυ
+    case greek::epsilon: // ει, ευ
+        return second.base == greek::iota || second.base == greek::upsilon;
+    case greek::omicron: // οι
+        return second.base == greek::iota;
+    default:
+        return false;
+    }
+}
+
+/// A consonant written twice but pronounced once, so the single form is a
+/// plausible misspelling of it and vice versa.
+inline bool isDoubleConsonant(const GreekChar& first, const GreekChar& second)
+{
+    if (first.base != second.base)
+    {
+        return false;
+    }
+    switch (first.base)
+    {
+    case greek::lambda:
+    case greek::rho:
+    case greek::sigma:
+    case greek::tau:
+    case greek::pi:
+    case greek::kappa:
+    case greek::mu:
+    case greek::nu:
+    case greek::beta:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// γγ and γκ
+inline bool isDigraph(const GreekChar* letters, size_t index)
+{
+    if (letters[index].base != greek::gamma)
+    {
+        return false;
+    }
+    const auto second = letters[index + 1].base;
+    if (second == greek::gamma)
+    {
+        return true;
+    }
+    return second == greek::kappa && index > 0;
+}
+
+constexpr uint8_t toFlag(GreekSpellingProblemType type)
+{
+    return type == GreekSpellingProblemType::None
+               ? uint8_t{0}
+               : static_cast<uint8_t>(1u << (static_cast<uint8_t>(type) - 1u));
+}
+
+/// Return a bitmask with the problems that can be generated from the word.
+inline uint8_t getGreekSpellingProblems(const char* word)
+{
+    GreekChar letters[maxGreekWordLetters];
+    const auto count = decodeGreekWord(word, letters);
+
+    uint8_t problems{0};
+    for (size_t i = 0; i < count; /* advanced below */)
+    {
+        // Ignore letters with dialytika, not interesting to worth the effort
+        if (letters[i].dialytika)
+        {
+            ++i;
+            continue;
+        }
+        // Two-letter patterns consume both letters
+        if (i + 1 < count && !letters[i + 1].dialytika
+            && isVowelPair(letters[i], letters[i + 1]))
+        {
+            // A tonos on the first vowel means the two are pronounced apart
+            // (πλάι, γάιδαρος) and there is no homophone. On the second vowel
+            // it is just how the pair is accented (αύριο), so it still counts.
+            if (!letters[i].accented)
+            {
+                problems |= toFlag(GreekSpellingProblemType::Diphthong);
+            }
+            i += 2;
+        }
+        else if (i + 1 < count && isDigraph(letters, i))
+        {
+            problems |= toFlag(GreekSpellingProblemType::Digraph);
+            i += 2;
+        }
+        else if (i + 1 < count && isDoubleConsonant(letters[i], letters[i + 1]))
+        {
+            problems |= toFlag(GreekSpellingProblemType::DoubleConsonant);
+            i += 2;
+        }
+        else if (isAmbiguousVowel(letters[i]))
+        {
+            problems |= toFlag(GreekSpellingProblemType::Vowel);
+            ++i;
+        }
+        else
+        {
+            ++i;
+        }
+    }
+    return problems;
+}
