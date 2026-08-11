@@ -1492,6 +1492,61 @@ public:
         {
             return nullptr;
         }
+        return readLineHelper(file);
+    }
+
+    const char* readRandomLine()
+    {
+        auto file      = fs_.open(filename_, 1 /* FILE_READ */);
+        auto closeFile = makeScopedDestructor(
+            [&file]
+            {
+                if (file)
+                {
+                    file.close();
+                }
+            });
+
+        if (!file || !file.available())
+        {
+            return nullptr;
+        }
+
+        // Move to a random location in the file, go to the next line
+        // and read that line.
+        // If we hit an EOF, retry and go to the beginning as a last resort
+        const auto fileSize = file.size();
+        for (int attempt = 0; attempt < 3; ++attempt)
+        {
+            const auto randomOffset = random(fileSize);
+            file.seek(randomOffset);
+            if (randomOffset != 0)
+            {
+                while (file.available() && file.read() != '\n')
+                {
+                }
+            }
+            if (file.available())
+            {
+                return readLineHelper(file);
+            }
+        }
+        file.seek(0);
+        return readLineHelper(file);
+    }
+
+private:
+    const char* filename_;
+    FileSystem& fs_;
+    char buffer_[BufferSize]{'\0'};
+
+    template<typename FileT>
+    const char* readLineHelper(FileT& file)
+    {
+        if (!file || !file.available())
+        {
+            return nullptr;
+        }
         size_t length = 0;
         while (file.available() && length < BufferSize - 1)
         {
@@ -1509,11 +1564,6 @@ public:
         buffer_[length] = '\0';
         return buffer_;
     }
-
-private:
-    const char* filename_;
-    FileSystem& fs_;
-    char buffer_[BufferSize]{'\0'};
 };
 
 template<typename FileSystem, size_t BufferSize>
