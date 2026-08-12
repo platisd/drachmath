@@ -229,6 +229,10 @@ void setup()
     pinMode(WIO_BUZZER, OUTPUT);
     attachInterrupts();
     Serial.begin(115200);
+    while (!Serial)
+    {
+        ; // Wait for serial port to connect. Needed for native USB port only
+    }
     sdCardChecker.begin();
     if (sdCardChecker.isSdCardReadyToUse())
     {

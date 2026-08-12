@@ -1713,6 +1713,9 @@ makeSdCardChecker(TestFileWriter testFileWriter,
         testFileWriter, sdCardInitializer, sdCardPresentDetector};
 }
 
+/* GreekSpellingQuiz */
+
+constexpr size_t greekSpellingProblemTypeCount{4};
 enum class GreekSpellingProblemType : uint8_t
 {
     None,
@@ -1720,6 +1723,27 @@ enum class GreekSpellingProblemType : uint8_t
     Diphthong,
     DoubleConsonant,
     Digraph
+};
+
+/// The set of letters a blanked spot can plausibly be filled with
+enum class GreekHomophoneGroup : uint8_t
+{
+    None,
+    EpsilonSound, // ε, αι
+    IotaSound,    // ι, η, υ, ει, οι
+    OmicronSound, // ο, ω
+    AvSound,      // αυ, αβ, αφ
+    EvSound,      // ευ, εβ, εφ
+    DoubleLambda,
+    DoubleRho,
+    DoubleSigma,
+    DoubleTau,
+    DoublePi,
+    DoubleKappa,
+    DoubleMu,
+    DoubleNu,
+    DoubleBeta,
+    GammaNasal // γγ, γκ
 };
 
 namespace greek
@@ -1943,6 +1967,65 @@ inline bool isDigraph(const GreekChar* letters, size_t index)
     return second == greek::kappa && index > 0;
 }
 
+/// The homophones a one- or two-letter spot can be filled from. Reads the
+/// folded bases, so tones and final sigma are already out of the way.
+inline GreekHomophoneGroup
+getHomophoneGroup(const GreekChar* letters, size_t index, uint8_t letterCount)
+{
+    const auto first = letters[index].base;
+    if (letterCount == 2)
+    {
+        const auto second = letters[index + 1].base;
+        switch (first)
+        {
+        case greek::alpha: // αι, αυ
+            return second == greek::iota ? GreekHomophoneGroup::EpsilonSound
+                                         : GreekHomophoneGroup::AvSound;
+        case greek::epsilon: // ει, ευ
+            return second == greek::iota ? GreekHomophoneGroup::IotaSound
+                                         : GreekHomophoneGroup::EvSound;
+        case greek::omicron: // οι
+            return GreekHomophoneGroup::IotaSound;
+        case greek::gamma: // γγ, γκ
+            return GreekHomophoneGroup::GammaNasal;
+        case greek::lambda:
+            return GreekHomophoneGroup::DoubleLambda;
+        case greek::rho:
+            return GreekHomophoneGroup::DoubleRho;
+        case greek::sigma:
+            return GreekHomophoneGroup::DoubleSigma;
+        case greek::tau:
+            return GreekHomophoneGroup::DoubleTau;
+        case greek::pi:
+            return GreekHomophoneGroup::DoublePi;
+        case greek::kappa:
+            return GreekHomophoneGroup::DoubleKappa;
+        case greek::mu:
+            return GreekHomophoneGroup::DoubleMu;
+        case greek::nu:
+            return GreekHomophoneGroup::DoubleNu;
+        case greek::beta:
+            return GreekHomophoneGroup::DoubleBeta;
+        default:
+            return GreekHomophoneGroup::None;
+        }
+    }
+    switch (first)
+    {
+    case greek::epsilon:
+        return GreekHomophoneGroup::EpsilonSound;
+    case greek::omicron:
+    case greek::omega:
+        return GreekHomophoneGroup::OmicronSound;
+    case greek::iota:
+    case greek::eta:
+    case greek::upsilon:
+        return GreekHomophoneGroup::IotaSound;
+    default:
+        return GreekHomophoneGroup::None;
+    }
+}
+
 constexpr uint8_t toFlag(GreekSpellingProblemType type)
 {
     return type == GreekSpellingProblemType::None
@@ -1950,13 +2033,75 @@ constexpr uint8_t toFlag(GreekSpellingProblemType type)
                : static_cast<uint8_t>(1u << (static_cast<uint8_t>(type) - 1u));
 }
 
-/// Return a bitmask with the problems that can be generated from the word.
-inline uint8_t getGreekSpellingProblems(const char* word)
+constexpr size_t toIndex(GreekSpellingProblemType type)
+{
+    // None has no slot of its own
+    return static_cast<size_t>(type) - 1u;
+}
+
+/// Where to blank a word and what the blank can be filled with. The offsets
+/// index into the word that was handed to getGreekSpellingProblems, so nothing
+/// here owns a string.
+struct GreekSpellingCandidate
+{
+    GreekHomophoneGroup group{GreekHomophoneGroup::None};
+    uint16_t byteOffset{0}; // Where the gap starts in the original word
+    uint8_t byteLength{0};  // 2 for one Greek letter, 4 for two
+};
+
+struct GreekSpellingProblems
+{
+    GreekSpellingCandidate byType[greekSpellingProblemTypeCount]{};
+    uint8_t available{0}; // Bitmask of toFlag() values
+
+    bool has(GreekSpellingProblemType type) const
+    {
+        return (available & toFlag(type)) != 0;
+    }
+
+    const GreekSpellingCandidate& get(GreekSpellingProblemType type) const
+    {
+        return byType[toIndex(type)];
+    }
+};
+
+/// Choose a candidate of the given type to offer as a spelling problem.
+/// If there are multiple candidates of the same type, each has an equal chance
+/// of being offered.
+inline void offerSpellingCandidate(GreekSpellingProblems& problems,
+                                   int (&seen)[greekSpellingProblemTypeCount],
+                                   GreekSpellingProblemType type,
+                                   const GreekChar* letters,
+                                   size_t index,
+                                   int letterCount)
+{
+    const auto slot = toIndex(type);
+    ++seen[slot];
+    // Keep the first spot, then replace the one held with probability 1/seen
+    if (random(seen[slot]) != 0)
+    {
+        return;
+    }
+    const auto gapLength = static_cast<uint8_t>(
+        letterCount == 2
+            ? letters[index].byteLength + letters[index + 1].byteLength
+            : letters[index].byteLength);
+    problems.available |= toFlag(type);
+    problems.byType[slot]
+        = GreekSpellingCandidate{getHomophoneGroup(letters, index, letterCount),
+                                 letters[index].byteOffset,
+                                 gapLength};
+}
+
+/// Return the problems that can be generated from the word.
+inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
 {
     GreekChar letters[maxGreekWordLetters];
     const auto count = decodeGreekWord(word, letters);
 
-    uint8_t problems{0};
+    GreekSpellingProblems problems{};
+    // How many spots of each type we have come across so far
+    int seen[greekSpellingProblemTypeCount]{};
     for (size_t i = 0; i < count; /* advanced below */)
     {
         // Ignore letters with dialytika, not interesting to worth the effort
@@ -1974,23 +2119,39 @@ inline uint8_t getGreekSpellingProblems(const char* word)
             // it is just how the pair is accented (αύριο), so it still counts.
             if (!letters[i].accented)
             {
-                problems |= toFlag(GreekSpellingProblemType::Diphthong);
+                offerSpellingCandidate(problems,
+                                       seen,
+                                       GreekSpellingProblemType::Diphthong,
+                                       letters,
+                                       i,
+                                       2);
             }
             i += 2;
         }
         else if (i + 1 < count && isDigraph(letters, i))
         {
-            problems |= toFlag(GreekSpellingProblemType::Digraph);
+            offerSpellingCandidate(problems,
+                                   seen,
+                                   GreekSpellingProblemType::Digraph,
+                                   letters,
+                                   i,
+                                   2);
             i += 2;
         }
         else if (i + 1 < count && isDoubleConsonant(letters[i], letters[i + 1]))
         {
-            problems |= toFlag(GreekSpellingProblemType::DoubleConsonant);
+            offerSpellingCandidate(problems,
+                                   seen,
+                                   GreekSpellingProblemType::DoubleConsonant,
+                                   letters,
+                                   i,
+                                   2);
             i += 2;
         }
         else if (isAmbiguousVowel(letters[i]))
         {
-            problems |= toFlag(GreekSpellingProblemType::Vowel);
+            offerSpellingCandidate(
+                problems, seen, GreekSpellingProblemType::Vowel, letters, i, 1);
             ++i;
         }
         else
