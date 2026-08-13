@@ -140,40 +140,72 @@ enum class ButtonEvent
     Right
 };
 
-using KeyListener = void (*)(char);
-template<typename... Listeners>
+/// std::is_same reimplementation to avoid including <type_traits>
+template<typename A, typename B>
+struct SameType
+{
+    static constexpr bool value = false;
+};
+
+template<typename T>
+struct SameType<T, T>
+{
+    static constexpr bool value = true;
+};
+
+template<typename T, typename... Rest>
+struct AllSameType
+{
+    static constexpr bool value = true;
+};
+
+template<typename T, typename U, typename... Rest>
+struct AllSameType<T, U, Rest...>
+{
+    static constexpr bool value
+        = SameType<T, U>::value && AllSameType<U, Rest...>::value;
+};
+
+template<typename KeyListenerT, typename... Listeners>
 struct KeyboardListeners
 {
-    constexpr KeyboardListeners(Listeners... listeners)
-        : listeners{listeners...}
+    constexpr KeyboardListeners(KeyListenerT first, Listeners... listeners)
+        : listeners{first, listeners...}
     {
+        static_assert(AllSameType<KeyListenerT, Listeners...>::value,
+                      "All listeners must have the same type");
     }
-    static constexpr size_t size = sizeof...(Listeners);
-    KeyListener listeners[size];
+
+    static constexpr size_t size = 1 + sizeof...(Listeners);
+    KeyListenerT listeners[size];
 };
 
-template<typename... Listeners>
-constexpr KeyboardListeners<Listeners...>
-makeKeyboardListeners(Listeners... listeners)
+template<typename KeyListenerT, typename... Listeners>
+constexpr KeyboardListeners<KeyListenerT, Listeners...>
+makeKeyboardListeners(KeyListenerT first, Listeners... listeners)
 {
-    return KeyboardListeners<Listeners...>{listeners...};
+    return KeyboardListeners<KeyListenerT, Listeners...>{first, listeners...};
 }
 
-template<typename... Labels>
+template<typename LabelT, typename... Labels>
 struct KeyLabels
 {
-    constexpr KeyLabels(Labels... labels)
-        : labels{labels...}
+    constexpr KeyLabels(LabelT first, Labels... labels)
+        : labels{first, labels...}
     {
+        static_assert(AllSameType<LabelT, Labels...>::value,
+                      "All labels must have the same type");
     }
-    static constexpr size_t size = sizeof...(Labels);
-    char labels[size];
+
+    static constexpr size_t size = 1 + sizeof...(Labels);
+    LabelT labels[size];
 };
 
-template<typename... Labels>
-constexpr KeyLabels<Labels...> makeKeyLabels(Labels... labels)
+template<typename LabelT, typename... Labels>
+constexpr KeyLabels<LabelT, Labels...> makeKeyLabels(LabelT first,
+                                                     Labels... labels)
 {
-    return KeyLabels<Labels...>{labels...};
+    return KeyLabels<LabelT, Labels...>{first, labels...};
 }
 
 template<int Rows,
@@ -227,7 +259,7 @@ public:
                 {
                     break;
                 }
-                char label = labels_.labels[index];
+                auto label = labels_.labels[index];
                 int x      = rect_.x0 + col * keyWidth;
                 int y      = rect_.y0 + row * keyHeight;
                 tft_.drawRoundRect(
@@ -266,7 +298,7 @@ public:
         tft_.setTextSize(1); // Text size multiplier to 1 since we use drawChar
         if (prevIndex < Labels::size)
         {
-            char prevLabel = labels_.labels[prevIndex];
+            auto prevLabel = labels_.labels[prevIndex];
             tft_.setTextColor(labelColor_);
             tft_.drawChar(prevLabel,
                           prevX + keyWidth / 2 - 4,
@@ -286,7 +318,7 @@ public:
         int newIndex = selectedRow_ * Columns + selectedCol_;
         if (newIndex < Labels::size)
         {
-            char newLabel = labels_.labels[newIndex];
+            auto newLabel = labels_.labels[newIndex];
             tft_.setTextColor(labelColor_);
             tft_.drawChar(
                 newLabel, newX + keyWidth / 2 - 4, newY + keyHeight / 2 - 8, 2);
@@ -325,7 +357,7 @@ public:
             int index = selectedRow_ * Columns + selectedCol_;
             if (index < Labels::size)
             {
-                char key = labels_.labels[index];
+                auto key = labels_.labels[index];
                 for (const auto& listener : listeners_.listeners)
                 {
                     listener(key);
