@@ -1747,13 +1747,12 @@ makeSdCardChecker(TestFileWriter testFileWriter,
 
 /* GreekSpellingQuiz */
 
-constexpr size_t greekSpellingProblemTypeCount{4};
+constexpr size_t greekSpellingProblemTypeCount{3};
 enum class GreekSpellingProblemType : uint8_t
 {
     None,
     Vowel,
     Diphthong,
-    DoubleConsonant,
     Digraph
 };
 
@@ -1766,16 +1765,7 @@ enum class GreekHomophoneGroup : uint8_t
     OmicronSound, // ο, ω
     AvSound,      // αυ, αβ, αφ
     EvSound,      // ευ, εβ, εφ
-    DoubleLambda,
-    DoubleRho,
-    DoubleSigma,
-    DoubleTau,
-    DoublePi,
-    DoubleKappa,
-    DoubleMu,
-    DoubleNu,
-    DoubleBeta,
-    GammaNasal // γγ, γκ
+    GammaNasal    // γγ, γκ
 };
 
 namespace greek
@@ -1959,31 +1949,6 @@ inline bool isVowelPair(const GreekChar& first, const GreekChar& second)
     }
 }
 
-/// A consonant written twice but pronounced once, so the single form is a
-/// plausible misspelling of it and vice versa.
-inline bool isDoubleConsonant(const GreekChar& first, const GreekChar& second)
-{
-    if (first.base != second.base)
-    {
-        return false;
-    }
-    switch (first.base)
-    {
-    case greek::lambda:
-    case greek::rho:
-    case greek::sigma:
-    case greek::tau:
-    case greek::pi:
-    case greek::kappa:
-    case greek::mu:
-    case greek::nu:
-    case greek::beta:
-        return true;
-    default:
-        return false;
-    }
-}
-
 /// γγ and γκ
 inline bool isDigraph(const GreekChar* letters, size_t index)
 {
@@ -2020,24 +1985,6 @@ getHomophoneGroup(const GreekChar* letters, size_t index, uint8_t letterCount)
             return GreekHomophoneGroup::IotaSound;
         case greek::gamma: // γγ, γκ
             return GreekHomophoneGroup::GammaNasal;
-        case greek::lambda:
-            return GreekHomophoneGroup::DoubleLambda;
-        case greek::rho:
-            return GreekHomophoneGroup::DoubleRho;
-        case greek::sigma:
-            return GreekHomophoneGroup::DoubleSigma;
-        case greek::tau:
-            return GreekHomophoneGroup::DoubleTau;
-        case greek::pi:
-            return GreekHomophoneGroup::DoublePi;
-        case greek::kappa:
-            return GreekHomophoneGroup::DoubleKappa;
-        case greek::mu:
-            return GreekHomophoneGroup::DoubleMu;
-        case greek::nu:
-            return GreekHomophoneGroup::DoubleNu;
-        case greek::beta:
-            return GreekHomophoneGroup::DoubleBeta;
         default:
             return GreekHomophoneGroup::None;
         }
@@ -2165,16 +2112,6 @@ inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
             offerSpellingCandidate(problems,
                                    seen,
                                    GreekSpellingProblemType::Digraph,
-                                   letters,
-                                   i,
-                                   2);
-            i += 2;
-        }
-        else if (i + 1 < count && isDoubleConsonant(letters[i], letters[i + 1]))
-        {
-            offerSpellingCandidate(problems,
-                                   seen,
-                                   GreekSpellingProblemType::DoubleConsonant,
                                    letters,
                                    i,
                                    2);
