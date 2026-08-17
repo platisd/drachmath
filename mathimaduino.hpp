@@ -82,6 +82,26 @@ constexpr T clamp0(T value)
     return value < 0 ? 0 : value;
 }
 
+/// Encode a unicode character as UTF-8 string (null terminated)
+/// Returns the number of bytes written, excluding the null terminator
+inline int encodeGreekChar(uint16_t codepoint, char (&encoded)[3])
+{
+    if (codepoint < 0x80)
+    {
+        encoded[0] = static_cast<char>(codepoint);
+        encoded[1] = '\0';
+        return 1;
+    }
+    if (codepoint < 0x800)
+    {
+        encoded[0] = static_cast<char>(0xC0 | (codepoint >> 6));
+        encoded[1] = static_cast<char>(0x80 | (codepoint & 0x3F));
+        encoded[2] = '\0';
+        return 2;
+    }
+    return 0;
+}
+
 namespace colors
 {
 constexpr TftColor Black{0, 0, 0};
@@ -140,6 +160,9 @@ enum class ButtonEvent
     Right
 };
 
+// Used for English characters and strings
+constexpr uint8_t defaultEngFont{1U};
+
 /// std::is_same reimplementation to avoid including <type_traits>
 template<typename A, typename B>
 struct SameType
@@ -164,6 +187,35 @@ struct AllSameType<T, U, Rest...>
 {
     static constexpr bool value
         = SameType<T, U>::value && AllSameType<U, Rest...>::value;
+};
+
+/// Hacky way to enable the Greek font only for a particular
+/// scope without loading/unloading it.
+/// The precondition is that before entering the scope we must
+/// have loaded the Greek font and not unloaded it yet.
+class ScopedGreekFont
+{
+public:
+    explicit ScopedGreekFont(TFT_eSPI& tft)
+        : tft_{tft}
+    {
+        // Setting fontLoaded to true directly would work until
+        // we set it after accidentally unloading the font, which
+        // would probably make bad things happen.
+        // gUnicode should generally never be NULL unless our unloading
+        // the Greek font logic is wrong
+        tft_.fontLoaded = (tft_.gUnicode != nullptr);
+    }
+
+    ~ScopedGreekFont()
+    {
+        tft_.fontLoaded = false; // Suspended is the resting state
+    }
+    ScopedGreekFont(const ScopedGreekFont&)            = delete;
+    ScopedGreekFont& operator=(const ScopedGreekFont&) = delete;
+
+private:
+    TFT_eSPI& tft_;
 };
 
 template<typename KeyListenerT, typename... Listeners>
@@ -196,6 +248,7 @@ struct KeyLabels
         static_assert(AllSameType<LabelT, Labels...>::value,
                       "All labels must have the same type");
     }
+    using LabelType = LabelT;
 
     static constexpr size_t size = 1 + sizeof...(Labels);
     LabelT labels[size];
@@ -237,7 +290,12 @@ public:
         enabled_ = enable;
     }
 
-    void begin(RectangleDimensions rect)
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void begin(const RectangleDimensions& rect)
     {
         rect_ = rect;
         enableKeyboard(true);
@@ -249,7 +307,7 @@ public:
             rect_.x0, rect_.y0, rect_.width, rect_.height, unpressedColor_);
         int keyWidth  = rect_.width / Columns;
         int keyHeight = rect_.height / Rows;
-        tft_.setTextSize(1); // Text size multiplier to 1 since we use drawChar
+        maybeSetFontSize(LabelType{});
         for (int row = 0; row < Rows; ++row)
         {
             for (int col = 0; col < Columns; ++col)
@@ -259,12 +317,13 @@ public:
                 {
                     break;
                 }
-                auto label = labels_.labels[index];
-                int x      = rect_.x0 + col * keyWidth;
-                int y      = rect_.y0 + row * keyHeight;
+                auto label      = labels_.labels[index];
+                int x           = rect_.x0 + col * keyWidth;
+                int y           = rect_.y0 + row * keyHeight;
+                bool isSelected = (row == selectedRow_ && col == selectedCol_);
                 tft_.drawRoundRect(
                     x, y, keyWidth, keyHeight, rect_.radius, outlineColor_);
-                if (row == selectedRow_ && col == selectedCol_)
+                if (isSelected)
                 {
                     tft_.fillRoundRect(x + 1,
                                        y + 1,
@@ -273,9 +332,9 @@ public:
                                        rect_.radius,
                                        pressedColor_);
                 }
-                tft_.setTextColor(labelColor_);
-                tft_.drawChar(
-                    label, x + keyWidth / 2 - 4, y + keyHeight / 2 - 8, 2);
+                tft_.setTextColor(labelColor_,
+                                  isSelected ? pressedColor_ : unpressedColor_);
+                drawLabel(label, x + keyWidth / 2, y + keyHeight / 2);
             }
         }
     }
@@ -295,15 +354,12 @@ public:
                            unpressedColor_);
         // Draw the label for the previously selected key
         int prevIndex = previousRow * Columns + previousCol;
-        tft_.setTextSize(1); // Text size multiplier to 1 since we use drawChar
+        maybeSetFontSize(LabelType{});
         if (prevIndex < Labels::size)
         {
             auto prevLabel = labels_.labels[prevIndex];
-            tft_.setTextColor(labelColor_);
-            tft_.drawChar(prevLabel,
-                          prevX + keyWidth / 2 - 4,
-                          prevY + keyHeight / 2 - 8,
-                          2);
+            tft_.setTextColor(labelColor_, unpressedColor_);
+            drawLabel(prevLabel, prevX + keyWidth / 2, prevY + keyHeight / 2);
         }
         // Draw the newly selected key with pressed color
         int newX = rect_.x0 + selectedCol_ * keyWidth;
@@ -319,9 +375,8 @@ public:
         if (newIndex < Labels::size)
         {
             auto newLabel = labels_.labels[newIndex];
-            tft_.setTextColor(labelColor_);
-            tft_.drawChar(
-                newLabel, newX + keyWidth / 2 - 4, newY + keyHeight / 2 - 8, 2);
+            tft_.setTextColor(labelColor_, pressedColor_);
+            drawLabel(newLabel, newX + keyWidth / 2, newY + keyHeight / 2);
         }
     }
 
@@ -375,6 +430,8 @@ public:
     }
 
 private:
+    using LabelType = typename Labels::LabelType;
+
     TFT_eSPI& tft_;
     int32_t labelColor_;
     int32_t outlineColor_;
@@ -387,6 +444,40 @@ private:
     int selectedRow_{0};
     int selectedCol_{0};
     bool enabled_{false};
+
+    void maybeSetFontSize(char)
+    {
+        tft_.setTextSize(2); // Only relevant for drawChar
+    }
+
+    void maybeSetFontSize(uint16_t)
+    {
+        // Smooth unicode fonts are fixed size
+    }
+
+    void drawLabel(char label, int x, int y)
+    {
+        const auto textHalfWidth  = tft_.textWidth("1") / 2;
+        const auto textHalfHeight = tft_.fontHeight() / 2;
+        tft_.drawChar(label, x - textHalfWidth, y - textHalfHeight);
+    }
+
+    void drawLabel(uint16_t label, int x, int y)
+    {
+        char text[3]             = {'\0'};
+        const auto encodedLength = encodeGreekChar(label, text);
+        if (encodedLength > 0)
+        {
+            ScopedGreekFont greekFont{tft_};
+            const auto textHalfWidth  = tft_.textWidth(text) / 2;
+            const auto textHalfHeight = tft_.fontHeight() / 2;
+            tft_.setTextPadding(0);
+            tft_.setTextDatum(TC_DATUM);
+            tft_.drawString(text,
+                            x - textHalfWidth,
+                            y - textHalfHeight); // Greek character
+        }
+    }
 };
 
 template<int Rows,
@@ -454,7 +545,12 @@ public:
         enabled_ = enable;
     }
 
-    void begin(RectangleDimensions rect)
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void begin(const RectangleDimensions& rect)
     {
         rect_ = rect;
         enableQuiz(true);
@@ -477,7 +573,8 @@ public:
                  currentQuestion.operand2);
         tft_.drawString(questionBuffer_,
                         rect_.x0 + rect_.width / 2,
-                        rect_.y0 + rect_.height / 5);
+                        rect_.y0 + rect_.height / 5,
+                        defaultEngFont);
         userAnswerIndex_ = strlen(questionBuffer_);
     }
 
@@ -494,7 +591,8 @@ public:
             tft_.setTextPadding(rect_.width);
             tft_.drawString(questionBuffer_,
                             rect_.x0 + rect_.width / 2,
-                            rect_.y0 + rect_.height / 5);
+                            rect_.y0 + rect_.height / 5,
+                            defaultEngFont);
         }
     }
 
@@ -532,7 +630,8 @@ public:
                 tft_.setTextPadding(rect_.width);
                 tft_.drawString(questionBuffer_,
                                 rect_.x0 + rect_.width / 2,
-                                rect_.y0 + rect_.height / 5);
+                                rect_.y0 + rect_.height / 5,
+                                defaultEngFont);
             }
         }
             return false; // Stay in the quiz
@@ -549,7 +648,8 @@ public:
                 tft_.setTextPadding(rect_.width);
                 tft_.drawString(questionBuffer_,
                                 rect_.x0 + rect_.width / 2,
-                                rect_.y0 + rect_.height / 5);
+                                rect_.y0 + rect_.height / 5,
+                                defaultEngFont);
             }
         }
             return false; // Stay in the quiz
@@ -685,7 +785,7 @@ public:
         tft_.setTextSize(textSize_);
         tft_.setTextPadding(0);
         tft_.setTextDatum(MC_DATUM);
-        tft_.drawString(label, point_.x, point_.y);
+        tft_.drawString(label, point_.x, point_.y, defaultEngFont);
         strncpy(labelBuffer_, label, maxLabelLength - 1);
         labelBuffer_[maxLabelLength - 1] = '\0';
     }
@@ -754,7 +854,9 @@ ScoreKeeper<Lbl, TFT_eSPI> makeScoreKeeper(Lbl& label, TFT_eSPI& tft)
     return ScoreKeeper<Lbl, TFT_eSPI>{label, tft};
 }
 
-using ButtonListener = void (*)(ButtonEvent);
+/// Return true if the listener has consumed the event
+/// and the event should not be propagated to other listeners
+using ButtonListener = bool (*)(ButtonEvent);
 template<typename... Listeners>
 struct ButtonListeners
 {
@@ -773,7 +875,9 @@ makeButtonListeners(Listeners... listeners)
     return ButtonListeners<Listeners...>{listeners...};
 }
 
-using NavigationListener = void (*)(NavigationEvent);
+/// Return true if the listener has consumed the event
+/// and the event should not be propagated to other listeners
+using NavigationListener = bool (*)(NavigationEvent);
 template<typename... Listeners>
 struct NavigationListeners
 {
@@ -827,7 +931,11 @@ public:
             {
                 for (const auto& listener : navigationListeners_.listeners)
                 {
-                    listener(lastNavigationEvent_);
+                    const auto consumed = listener(lastNavigationEvent_);
+                    if (consumed)
+                    {
+                        break;
+                    }
                 }
                 lastNavigationEvent_ = NavigationEvent::None;
             }
@@ -838,7 +946,11 @@ public:
             {
                 for (const auto& listener : buttonListeners_.listeners)
                 {
-                    listener(lastButtonEvent_);
+                    const auto consumed = listener(lastButtonEvent_);
+                    if (consumed)
+                    {
+                        break;
+                    }
                 }
                 lastButtonEvent_ = ButtonEvent::None;
             }
@@ -854,7 +966,11 @@ public:
                 lastButtonEventTime_ = currentTime;
                 for (const auto& listener : buttonListeners_.listeners)
                 {
-                    listener(ButtonEvent::Right);
+                    const auto consumed = listener(ButtonEvent::Right);
+                    if (consumed)
+                    {
+                        break;
+                    }
                 }
                 lastButtonEvent_ = ButtonEvent::None;
             }
@@ -932,7 +1048,12 @@ public:
         enabled_ = enable;
     }
 
-    void begin(RectangleDimensions rect)
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void begin(const RectangleDimensions& rect)
     {
         rect_ = rect;
         enableMenu(true);
@@ -1016,7 +1137,8 @@ public:
             {
                 tft_.setTextColor(labelColor_, unSelectedColor_);
             }
-            tft_.drawString(entry.label, rect_.x0 + rect_.width / 2, y);
+            tft_.drawString(
+                entry.label, rect_.x0 + rect_.width / 2, y, defaultEngFont);
         }
     }
 
@@ -1031,15 +1153,18 @@ public:
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextPadding(getTextPadding());
         tft_.setTextColor(labelColor_, unSelectedColor_);
-        tft_.drawString(
-            previousEntry.label, rect_.x0 + rect_.width / 2, previousY);
+        tft_.drawString(previousEntry.label,
+                        rect_.x0 + rect_.width / 2,
+                        previousY,
+                        defaultEngFont);
 
         // Draw the newly selected entry with selected color
         const auto& newEntry = entries_.entries[selectedIndex_];
         int newY             = rect_.y0
                    + (selectedIndex_ + 1) * rect_.height / (entries_.size + 1);
         tft_.setTextColor(labelColor_, selectedColor_);
-        tft_.drawString(newEntry.label, rect_.x0 + rect_.width / 2, newY);
+        tft_.drawString(
+            newEntry.label, rect_.x0 + rect_.width / 2, newY, defaultEngFont);
     }
 
 private:
@@ -1237,15 +1362,20 @@ public:
     {
     }
 
-    void enableSettingsMenu(bool enable)
+    void enableMenu(bool enable)
     {
         enabled_ = enable;
     }
 
-    void begin(RectangleDimensions rect)
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void begin(const RectangleDimensions& rect)
     {
         rect_ = rect;
-        enableSettingsMenu(true);
+        enableMenu(true);
     }
 
     void draw()
@@ -1333,7 +1463,7 @@ public:
         // We only care about the right button which serves as exit
         if (event == ButtonEvent::Right)
         {
-            enableSettingsMenu(false);
+            enableMenu(false);
             return true; // Exit the settings menu
         }
         return false; // Stay in the settings menu
@@ -1365,13 +1495,14 @@ private:
         // also to remove any artifacts from the option text when it changes.
         const auto fullEntryWidth = rect_.width - 5 - 5; // 5px padding on sides
         tft_.setTextPadding(fullEntryWidth);
-        tft_.drawString(setting.entry.label, rect_.x0 + 5, y);
+        tft_.drawString(setting.entry.label, rect_.x0 + 5, y, defaultEngFont);
         // Draw the current config option aligned to the right
         tft_.setTextDatum(MR_DATUM);
         tft_.setTextPadding(0); // Label handles artifacts & highlighting
         formatOption(setting.config.options[setting.config.currentIndex]);
         tft_.setTextColor(labelColor_); // Label handles highlighting
-        tft_.drawString(optionBuffer_, rect_.x0 + rect_.width - 5, y);
+        tft_.drawString(
+            optionBuffer_, rect_.x0 + rect_.width - 5, y, defaultEngFont);
     }
 
     void formatOption(const char* option)
@@ -1598,7 +1729,7 @@ private:
     }
 };
 
-template<typename FileSystem, size_t BufferSize>
+template<size_t BufferSize, typename FileSystem>
 FileReader<FileSystem, BufferSize> makeFileReader(const char* filename,
                                                   FileSystem& fs)
 {
@@ -1631,9 +1762,8 @@ public:
     {
         for (auto& entry : settings_.entries)
         {
-            auto reader
-                = makeFileReader<FileSystem, 16>(entry.persistentFilePath, fs_);
-            auto value = reader.readLine();
+            auto reader = makeFileReader<16>(entry.persistentFilePath, fs_);
+            auto value  = reader.readLine();
             if (!value)
             {
                 continue;
@@ -1745,8 +1875,6 @@ makeSdCardChecker(TestFileWriter testFileWriter,
         testFileWriter, sdCardInitializer, sdCardPresentDetector};
 }
 
-/* GreekSpellingQuiz */
-
 constexpr size_t greekSpellingProblemTypeCount{3};
 enum class GreekSpellingProblemType : uint8_t
 {
@@ -1787,6 +1915,7 @@ constexpr uint16_t finalSigma{u'ς'};
 constexpr uint16_t sigma{u'σ'};
 constexpr uint16_t tau{u'τ'};
 constexpr uint16_t upsilon{u'υ'};
+constexpr uint16_t phi{u'φ'};
 constexpr uint16_t omega{u'ω'};
 
 constexpr uint16_t alphaTonos{u'ά'};
@@ -1813,12 +1942,12 @@ constexpr size_t maxGreekWordLetters{15};
 /// One decoded letter of a word
 struct GreekChar
 {
-    uint16_t codepoint{0};  // As it appeared in the word, e.g. ά
-    uint16_t base{0};       // Tone and final sigma folded away, e.g. α
-    uint16_t byteOffset{0}; // Where this letter starts in the original word
-    uint8_t byteLength{0};  // 2 for Greek, 1 for ASCII
-    bool accented{false};   // Carried a tonos
-    bool dialytika{false};  // Was ϊ ϋ ΐ ΰ
+    uint16_t codepoint{0}; // As it appeared in the word, e.g. ά
+    uint16_t base{0};      // Tone and final sigma folded away, e.g. α
+    int byteOffset{0};     // Where this letter starts in the original word
+    int byteLength{0};     // 2 for Greek, 1 for ASCII
+    bool accented{false};  // Carried a tonos
+    bool dialytika{false}; // Was ϊ ϋ ΐ ΰ
 };
 
 /// Reduce a codepoint to the letter it is a variant of
@@ -1874,7 +2003,7 @@ inline size_t decodeGreekWord(const char* word,
     {
         const auto lead = static_cast<uint8_t>(word[offset]);
         uint16_t codepoint{0};
-        uint8_t byteLength{0};
+        int byteLength{0};
         if (lead < 0x80)
         {
             codepoint  = lead;
@@ -2024,8 +2153,8 @@ constexpr size_t toIndex(GreekSpellingProblemType type)
 struct GreekSpellingCandidate
 {
     GreekHomophoneGroup group{GreekHomophoneGroup::None};
-    uint16_t byteOffset{0}; // Where the gap starts in the original word
-    uint8_t byteLength{0};  // 2 for one Greek letter, 4 for two
+    int byteOffset{0}; // Where the problem starts in the original word
+    int byteLength{0}; // 2 for one Greek letter, 4 for two
 };
 
 struct GreekSpellingProblems
@@ -2061,10 +2190,10 @@ inline void offerSpellingCandidate(GreekSpellingProblems& problems,
     {
         return;
     }
-    const auto gapLength = static_cast<uint8_t>(
-        letterCount == 2
-            ? letters[index].byteLength + letters[index + 1].byteLength
-            : letters[index].byteLength);
+    const auto gapLength
+        = letterCount == 2
+              ? letters[index].byteLength + letters[index + 1].byteLength
+              : letters[index].byteLength;
     problems.available |= toFlag(type);
     problems.byType[slot]
         = GreekSpellingCandidate{getHomophoneGroup(letters, index, letterCount),
@@ -2129,4 +2258,298 @@ inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
         }
     }
     return problems;
+}
+
+using KeyboardDrawer = void (*)(GreekHomophoneGroup);
+
+/// GreekSpellingQuiz
+template<typename TFT_eSPI,
+         typename Listeners,
+         typename SettingsHolderT,
+         typename FileReaderT>
+class GreekSpellingQuiz
+{
+public:
+    GreekSpellingQuiz(TFT_eSPI& tft,
+                      Listeners& listeners,
+                      SettingsHolderT& settingsHolder,
+                      FileReaderT& fileReader,
+                      TftColor backgroundColor,
+                      TftColor textColor)
+        : tft_{tft}
+        , listeners_{listeners}
+        , settingsHolder_{settingsHolder}
+        , fileReader_{fileReader}
+        , backgroundColor_{makeColor(backgroundColor)}
+        , textColor_{makeColor(textColor)}
+    {
+    }
+
+    void enableQuiz(bool enable)
+    {
+        enabled_ = enable;
+    }
+
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void begin(const RectangleDimensions& rect)
+    {
+        rect_ = rect;
+        enableQuiz(true);
+    }
+
+    void drawNewQuestion()
+    {
+        userInput_[0] = '\0';
+        if (!selectValidWordAndProblem())
+        {
+            setFallbackQuestion();
+        }
+        drawWord();
+        if (drawAppropriateKeyboard_)
+        {
+            drawAppropriateKeyboard_(currentProblem_.group);
+        }
+    }
+
+    void handleKeyboardPress(uint16_t greekChar)
+    {
+        if (!enabled_)
+        {
+            return;
+        }
+        char encoded[3]{'\0'};
+        const auto encodedLength = encodeGreekChar(greekChar, encoded);
+        if (encodedLength == 0)
+        {
+            return; // Invalid character?!
+        }
+        const auto currentLength = strlen(userInput_);
+        if (currentLength + encodedLength > maxUserInputLength)
+        {
+            return;
+        }
+        // Append the new character to the user input
+        memcpy(userInput_ + currentLength, encoded, encodedLength);
+        userInput_[currentLength + encodedLength] = '\0';
+        // Update the displayed word with the user's input
+        prepareDisplayedWord();
+        drawWord();
+    }
+
+    /// @return true on exit/transition, false otherwise
+    bool handleButtonEvent(ButtonEvent event)
+    {
+        if (!enabled_)
+        {
+            return false;
+        }
+        switch (event)
+        {
+        case ButtonEvent::Left:
+            if (isAnswerCorrect())
+            {
+                playCorrectSound();
+                for (const auto& listener : listeners_.listeners)
+                {
+                    listener();
+                }
+                drawNewQuestion();
+            }
+            else
+            {
+                playWrongSound();
+                userInput_[0] = '\0';
+                prepareDisplayedWord();
+                drawWord();
+            }
+            return false; // Stay in the quiz
+        case ButtonEvent::Middle:
+        {
+            const auto currentLength = static_cast<int>(strlen(userInput_));
+            if (currentLength == 0)
+            {
+                return false;
+            }
+            // Remove the last character, which may be 1 or 2 bytes
+            const int lastCharLength
+                = (userInput_[currentLength - 1] & 0x80) == 0 ? 1 : 2;
+            const size_t newLength = clamp0(currentLength - lastCharLength);
+            userInput_[newLength]  = '\0';
+            prepareDisplayedWord();
+            drawWord();
+        }
+            return false;
+        case ButtonEvent::Right:
+            // Exit the quiz and return to the menu
+            enableQuiz(false);
+            return true; // Exit the quiz
+        default:
+            return false;
+        }
+    }
+
+    GreekHomophoneGroup getCurrentProblemHomophone() const
+    {
+
+        return currentProblem_.group;
+    }
+
+    /// Must be called before drawing the first question so that the right
+    /// keyboard can be picked based on the homophone group of each question.
+    void registerKeyboardDrawer(KeyboardDrawer picker)
+    {
+        drawAppropriateKeyboard_ = picker;
+    }
+
+private:
+    TFT_eSPI& tft_;
+    Listeners& listeners_;
+    SettingsHolderT& settingsHolder_;
+    FileReaderT& fileReader_;
+    KeyboardDrawer drawAppropriateKeyboard_{nullptr};
+    int32_t backgroundColor_;
+    int32_t textColor_;
+    bool enabled_{false};
+    RectangleDimensions rect_{};
+
+    /// The randomly chosen word
+    char currentWord_[maxGreekWordLetters * 2 + 1]{'\0'};
+    constexpr static size_t maxUserInputLength{4}; // 2 Greek letters, 4 bytes
+    char displayedWord_[maxGreekWordLetters * 2 + maxUserInputLength + 1]{'\0'};
+    GreekSpellingCandidate currentProblem_{};
+    char userInput_[maxUserInputLength + 1]{'\0'};
+
+    bool isAnswerCorrect() const
+    {
+        const auto gapLength = static_cast<size_t>(currentProblem_.byteLength);
+        return strlen(userInput_) == gapLength
+               && memcmp(userInput_,
+                         currentWord_ + currentProblem_.byteOffset,
+                         gapLength)
+                      == 0;
+    }
+
+    bool selectValidWordAndProblem()
+    {
+        for (int attempt = 0; attempt < 100; ++attempt)
+        {
+            const auto word = fileReader_.readRandomLine();
+            if (!word)
+            {
+                continue;
+            }
+            // Two bytes per Greek character
+            const auto maxWordBytes
+                = 2 * static_cast<size_t>(settingsHolder_.getMaxWordLength());
+            if (strlen(word) > maxWordBytes)
+            {
+                continue;
+            }
+            const auto problems = getGreekSpellingProblems(word);
+            if (problems.available == 0)
+            {
+                continue;
+            }
+
+            const auto chosenType = chooseRandomProblemType(problems);
+            currentProblem_       = problems.get(chosenType);
+
+            strncpy(currentWord_, word, sizeof(currentWord_) - 1);
+            currentWord_[sizeof(currentWord_) - 1] = '\0';
+
+            prepareDisplayedWord();
+            return true;
+        }
+        return false;
+    }
+
+    GreekSpellingProblemType
+    chooseRandomProblemType(const GreekSpellingProblems& problems)
+    {
+        GreekSpellingProblemType chosenType{GreekSpellingProblemType::None};
+        while (chosenType == GreekSpellingProblemType::None)
+        {
+            const auto randomIndex = random(greekSpellingProblemTypeCount);
+            const auto type
+                = static_cast<GreekSpellingProblemType>(randomIndex + 1);
+            if (problems.has(type))
+            {
+                chosenType = type;
+            }
+        }
+        return chosenType;
+    }
+
+    void prepareDisplayedWord()
+    {
+        const auto prefixLength
+            = static_cast<size_t>(currentProblem_.byteOffset);
+        const auto inputLength = strlen(userInput_);
+        // The part of the word before the gap, unchanged
+        memcpy(displayedWord_, currentWord_, prefixLength);
+        // Then the gap, holding what the user has typed so far
+        memcpy(displayedWord_ + prefixLength, userInput_, inputLength);
+        auto offset = prefixLength + inputLength;
+        // Show a single underscore while nothing has been typed to
+        // avoid revealing the amount of missing letters
+        // Once something's typed no gap is shown at all.
+        if (inputLength == 0)
+        {
+            displayedWord_[offset++] = '_';
+        }
+        // Rest of the word, unchanged
+        strncpy(displayedWord_ + offset,
+                currentWord_ + prefixLength + currentProblem_.byteLength,
+                sizeof(displayedWord_) - offset - 1);
+        displayedWord_[sizeof(displayedWord_) - 1] = '\0';
+    }
+
+    void drawWord()
+    {
+        ScopedGreekFont greekFont{tft_};
+        tft_.setTextColor(textColor_, backgroundColor_);
+        // No need to set the size, the Greek font has fixed size
+        tft_.setTextDatum(BC_DATUM);
+        tft_.setTextPadding(rect_.width);
+        tft_.drawString(displayedWord_,
+                        rect_.x0 + rect_.width / 2,
+                        rect_.y0 + rect_.height / 2); // Greek string
+    }
+
+    void setFallbackQuestion()
+    {
+        strncpy(currentWord_, "τυρί", sizeof(currentWord_) - 1);
+        currentWord_[sizeof(currentWord_) - 1] = '\0';
+        // The υ of τυρί, two bytes in
+        currentProblem_
+            = GreekSpellingCandidate{GreekHomophoneGroup::IotaSound, 2, 2};
+        prepareDisplayedWord();
+    }
+};
+
+template<typename TFT_eSPI,
+         typename Listeners,
+         typename SettingsHolderT,
+         typename FileReaderT>
+GreekSpellingQuiz<TFT_eSPI, Listeners, SettingsHolderT, FileReaderT>
+makeGreekSpellingQuiz(TFT_eSPI& tft,
+                      Listeners& listeners,
+                      SettingsHolderT& settingsHolder,
+                      FileReaderT& fileReader,
+                      // KeyboardDrawer KeyboardDrawer,
+                      TftColor backgroundColor,
+                      TftColor textColor)
+{
+    return GreekSpellingQuiz<TFT_eSPI, Listeners, SettingsHolderT, FileReaderT>{
+        tft,
+        listeners,
+        settingsHolder,
+        fileReader,
+        // KeyboardDrawer,
+        backgroundColor,
+        textColor};
 }

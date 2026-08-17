@@ -28,15 +28,19 @@ auto scoreLabel
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
 SettingsHolder settingsHolder{};
-auto mathsQuiz = makeMathsQuiz(
-    tft, colors::Red, colors::White, mathsQuizListeners, settingsHolder);
-auto keyListeners = makeKeyboardListeners(
+auto mathsQuiz             = makeMathsQuiz(tft,
+                               screenBackgroundColor,
+                               colors::White,
+                               mathsQuizListeners,
+                               settingsHolder);
+auto mathKeyboardListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
-auto keyLabels
+auto mathKeyboardLabels
     = makeKeyLabels('1', '2', '3', '4', '5', '6', '7', '8', '9', '0');
-const KeyColors keyColors
+const KeyColors keyboardColors
     = {colors::White, colors::Black, colors::Green, colors::Gray};
-auto keyboard = makeKeyboard<2, 5>(tft, keyColors, keyLabels, keyListeners);
+auto mathKeyboard = makeKeyboard<2, 5>(
+    tft, keyboardColors, mathKeyboardLabels, mathKeyboardListeners);
 auto leftButtonLabel
     = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
 auto middleButtonLabel
@@ -53,6 +57,110 @@ const auto clearScreenExcludingButtonLabels = []
                       screenAreaExcludingButtonLabels.height,
                       screenAreaExcludingButtonLabels.radius,
                       makeColor(screenBackgroundColor));
+};
+
+auto greekSpellingQuizListeners
+    = makeQuizListeners([] { scoreKeeper.increment(); });
+
+constexpr size_t greekWordBufferSize
+    = maxGreekWordLetters * sizeof(uint16_t) + 1
+      + 10; // 10 extra bytes for safety in case there's a long word in the
+            // file. The +1 is for the null terminator.
+auto greekWordsFileReader
+    = makeFileReader<greekWordBufferSize>("greek_words.txt", SD);
+
+auto greekSpellingQuiz = makeGreekSpellingQuiz(tft,
+                                               greekSpellingQuizListeners,
+                                               settingsHolder,
+                                               greekWordsFileReader,
+                                               screenBackgroundColor,
+                                               colors::White);
+
+auto greekSpellingKeyboardListeners = makeKeyboardListeners(
+    [](uint16_t greekChar)
+    { greekSpellingQuiz.handleKeyboardPress(greekChar); });
+
+auto epsilonKeyboardLabels = makeKeyLabels(greek::epsilon,
+                                           greek::alpha,
+                                           greek::iota,
+                                           greek::epsilonTonos,
+                                           greek::alphaTonos,
+                                           greek::iotaTonos);
+auto epsilonKeyboard       = makeKeyboard<2, 3>(
+    tft, keyboardColors, epsilonKeyboardLabels, greekSpellingKeyboardListeners);
+
+auto iotaKeyboardLabels = makeKeyLabels(greek::iota,
+                                        greek::eta,
+                                        greek::upsilon,
+                                        greek::epsilon,
+                                        greek::omicron,
+                                        greek::iotaTonos,
+                                        greek::etaTonos,
+                                        greek::upsilonTonos);
+auto iotaKeyboard       = makeKeyboard<2, 4>(
+    tft, keyboardColors, iotaKeyboardLabels, greekSpellingKeyboardListeners);
+
+auto omicronKeyboardLabels = makeKeyLabels(
+    greek::omicron, greek::omega, greek::omicronTonos, greek::omegaTonos);
+auto omicronKeyboard = makeKeyboard<2, 2>(
+    tft, keyboardColors, omicronKeyboardLabels, greekSpellingKeyboardListeners);
+
+auto avKeyboardLabels = makeKeyLabels(greek::alpha,
+                                      greek::upsilon,
+                                      greek::beta,
+                                      greek::phi,
+                                      greek::upsilonTonos,
+                                      greek::alphaTonos);
+auto avKeyboard       = makeKeyboard<2, 3>(
+    tft, keyboardColors, avKeyboardLabels, greekSpellingKeyboardListeners);
+
+auto evKeyboardLabels = makeKeyLabels(greek::epsilon,
+                                      greek::upsilon,
+                                      greek::beta,
+                                      greek::phi,
+                                      greek::upsilonTonos,
+                                      greek::epsilonTonos);
+auto evKeyboard       = makeKeyboard<2, 3>(
+    tft, keyboardColors, evKeyboardLabels, greekSpellingKeyboardListeners);
+
+auto gammaKeyboardLabels = makeKeyLabels(greek::gamma, greek::kappa);
+auto gammaKeyboard       = makeKeyboard<1, 2>(
+    tft, keyboardColors, gammaKeyboardLabels, greekSpellingKeyboardListeners);
+
+RectangleDimensions keyboardAtBottom{};
+RectangleDimensions quizAboveKeyboardInTheMiddle{};
+
+const auto drawGreekKeyboard = [](GreekHomophoneGroup group)
+{
+    const auto beginAndDrawKeyboard = [](auto& keyboard)
+    {
+        keyboard.begin(keyboardAtBottom);
+        keyboard.draw();
+    };
+    // Disable all keyboards first to avoid any overlap
+    epsilonKeyboard.enableKeyboard(false);
+    iotaKeyboard.enableKeyboard(false);
+    omicronKeyboard.enableKeyboard(false);
+    avKeyboard.enableKeyboard(false);
+    evKeyboard.enableKeyboard(false);
+    gammaKeyboard.enableKeyboard(false);
+    switch (group)
+    {
+    case GreekHomophoneGroup::EpsilonSound:
+        return beginAndDrawKeyboard(epsilonKeyboard);
+    case GreekHomophoneGroup::IotaSound:
+        return beginAndDrawKeyboard(iotaKeyboard);
+    case GreekHomophoneGroup::OmicronSound:
+        return beginAndDrawKeyboard(omicronKeyboard);
+    case GreekHomophoneGroup::AvSound:
+        return beginAndDrawKeyboard(avKeyboard);
+    case GreekHomophoneGroup::EvSound:
+        return beginAndDrawKeyboard(evKeyboard);
+    case GreekHomophoneGroup::GammaNasal:
+        return beginAndDrawKeyboard(gammaKeyboard);
+    default:
+        return beginAndDrawKeyboard(iotaKeyboard);
+    }
 };
 
 const KeyColors menuColors
@@ -93,23 +201,27 @@ auto mainMenuEntries = makeMenuEntries(
         []
         {
             clearScreenExcludingButtonLabels();
-            const RectangleDimensions keyboardAtBottom{0,
-                                                       tft.height() * 2.0F
-                                                           / 3.0F,
-                                                       tft.width(),
-                                                       tft.height() / 3.0F,
-                                                       5};
-            keyboard.begin(keyboardAtBottom);
-            keyboard.draw();
-            const RectangleDimensions mathsQuizAboveKeyboardInTheMiddle{
-                0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
-            mathsQuiz.begin(mathsQuizAboveKeyboardInTheMiddle);
+            mathKeyboard.begin(keyboardAtBottom);
+            mathKeyboard.draw();
+            mathsQuiz.begin(quizAboveKeyboardInTheMiddle);
             mathsQuiz.drawNewQuestion();
             middleButtonLabel.draw("Del");
             rightButtonLabel.draw("Esc");
             return false; // Disable the main menu since we are now in the quiz
         }},
-    MenuEntry{"Spelling Quiz"},
+    MenuEntry{
+        "Spelling Quiz",
+        []
+        {
+            tft.loadFont("ubuntu-greek-latin-32");
+            clearScreenExcludingButtonLabels();
+            greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
+            greekSpellingQuiz.drawNewQuestion();
+            middleButtonLabel.draw("Del");
+            rightButtonLabel.draw("Esc");
+            drawGreekKeyboard(greekSpellingQuiz.getCurrentProblemHomophone());
+            return false; // Disable the main menu since we are now in the quiz
+        }},
     MenuEntry{
         "Settings",
         []
@@ -143,10 +255,12 @@ auto mainMenu = makeMenu(tft, mainMenuEntries, menuColors);
 auto buttonListeners = makeButtonListeners(
     [](ButtonEvent event)
     {
-        const auto shouldExit = mathsQuiz.handleButtonEvent(event);
+        const auto consumedEvent = mathsQuiz.isEnabled();
+        const auto shouldExit    = mathsQuiz.handleButtonEvent(event);
         if (shouldExit)
         {
-            keyboard.enableKeyboard(false);
+            mathKeyboard.enableKeyboard(false);
+            mathsQuiz.enableQuiz(false);
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();
@@ -154,16 +268,19 @@ auto buttonListeners = makeButtonListeners(
             middleButtonLabel.clear(); // Button not used in main menu
             rightButtonLabel.clear();
         }
+        return consumedEvent; // Event consumed if quiz was initially enabled
     },
     [](ButtonEvent event)
     {
-        const auto shouldExit = settingsMenu.handleButtonEvent(event);
+        const auto consumedEvent = settingsMenu.isEnabled();
+        const auto shouldExit    = settingsMenu.handleButtonEvent(event);
         if (shouldExit)
         {
             if (sdCardChecker.isSdCardReadyToUse())
             {
                 persistentSettings.save();
             }
+            settingsMenu.enableMenu(false);
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();
@@ -171,13 +288,73 @@ auto buttonListeners = makeButtonListeners(
             middleButtonLabel.clear();
             rightButtonLabel.clear();
         }
+        return consumedEvent;
     },
-    [](ButtonEvent event) { mainMenu.handleButtonEvent(event); });
+    [](ButtonEvent event)
+    {
+        const auto consumedEvent = mainMenu.isEnabled();
+        mainMenu.handleButtonEvent(event);
+        return consumedEvent;
+    },
+    [](ButtonEvent event)
+    {
+        const auto consumedEvent = greekSpellingQuiz.isEnabled();
+        const auto shouldExit    = greekSpellingQuiz.handleButtonEvent(event);
+        if (shouldExit)
+        {
+            greekSpellingQuiz.enableQuiz(false);
+            tft.unloadFont();
+            // Disable all keyboards just in case one of them is enabled
+            epsilonKeyboard.enableKeyboard(false);
+            iotaKeyboard.enableKeyboard(false);
+            omicronKeyboard.enableKeyboard(false);
+            avKeyboard.enableKeyboard(false);
+            evKeyboard.enableKeyboard(false);
+            gammaKeyboard.enableKeyboard(false);
+            clearScreenExcludingButtonLabels();
+            mainMenu.enableMenu(true);
+            mainMenu.draw();
+            leftButtonLabel.draw("Sel");
+            middleButtonLabel.clear();
+            rightButtonLabel.clear();
+        }
+        return consumedEvent;
+    });
 
 auto navigationListeners = makeNavigationListeners(
-    [](NavigationEvent event) { keyboard.handleNavigationEvent(event); },
-    [](NavigationEvent event) { settingsMenu.handleNavigationEvent(event); },
-    [](NavigationEvent event) { mainMenu.handleNavigationEvent(event); });
+    [](NavigationEvent event)
+    {
+        const auto consumedEvent = mathKeyboard.isEnabled();
+        mathKeyboard.handleNavigationEvent(event);
+        return consumedEvent;
+    },
+    [](NavigationEvent event)
+    {
+        const auto consumedEvent = settingsMenu.isEnabled();
+        settingsMenu.handleNavigationEvent(event);
+        return consumedEvent;
+    },
+    [](NavigationEvent event)
+    {
+        const auto consumedEvent = mainMenu.isEnabled();
+        mainMenu.handleNavigationEvent(event);
+        return consumedEvent;
+    },
+    [](NavigationEvent event)
+    {
+        const auto consumedEvent = greekSpellingQuiz.isEnabled();
+        // Let's group all the Greek keyboards together for clarity
+        // We rely on the irrelevant keyboards being disabled
+        // and pass the event to all of them.
+        // Only the enabled/correct keyboard should  respond to the event.
+        epsilonKeyboard.handleNavigationEvent(event);
+        iotaKeyboard.handleNavigationEvent(event);
+        omicronKeyboard.handleNavigationEvent(event);
+        avKeyboard.handleNavigationEvent(event);
+        evKeyboard.handleNavigationEvent(event);
+        gammaKeyboard.handleNavigationEvent(event);
+        return consumedEvent;
+    });
 auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
 
 void attachInterrupts()
@@ -260,6 +437,11 @@ void setup()
                                               5};
     mainMenu.begin(menuInTheMiddle);
     mainMenu.draw();
+    greekSpellingQuiz.registerKeyboardDrawer(drawGreekKeyboard);
+    keyboardAtBottom = RectangleDimensions{
+        0, tft.height() * 2.0F / 3.0F, tft.width(), tft.height() / 3.0F, 5};
+    quizAboveKeyboardInTheMiddle = RectangleDimensions{
+        0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
 }
 
 void loop()
