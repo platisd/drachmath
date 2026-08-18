@@ -2061,9 +2061,14 @@ inline bool isAmbiguousVowel(const GreekChar& letter)
     }
 }
 
+inline bool isOuPair(const GreekChar& first, const GreekChar& second)
+{
+    return first.base == greek::omicron && second.base == greek::upsilon;
+}
+
 /// The two-letter vowel graphemes with a homophonic counterpart: αι, ει, οι,
-/// αυ and ευ. ου, υι and ηυ are deliberately not here; they have nothing to be
-/// confused with, so they fall through and are scanned as single letters.
+/// αυ and ευ. υι and ηυ are to be treated as individual vowels, while ου is too
+/// easy so treated separately
 inline bool isVowelPair(const GreekChar& first, const GreekChar& second)
 {
     switch (first.base)
@@ -2220,7 +2225,12 @@ inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
         }
         // Two-letter patterns consume both letters
         if (i + 1 < count && !letters[i + 1].dialytika
-            && isVowelPair(letters[i], letters[i + 1]))
+            && isOuPair(letters[i], letters[i + 1]))
+        {
+            i += 2; // Ignore ου, no homophone and obvious as a vowel pair
+        }
+        else if (i + 1 < count && !letters[i + 1].dialytika
+                 && isVowelPair(letters[i], letters[i + 1]))
         {
             // A tonos on the first vowel means the two are pronounced apart
             // (πλάι, γάιδαρος) and there is no homophone. On the second vowel
