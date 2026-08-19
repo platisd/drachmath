@@ -33,6 +33,7 @@ auto mathsQuizListeners = makeQuizListeners(
         {
             scoreKeeper.increment();
         }
+        scoreKeeper.logAnswer(QuizType::Maths, correct);
     });
 SettingsHolder settingsHolder{};
 auto mathsQuiz             = makeMathsQuiz(tft,
@@ -73,6 +74,7 @@ auto greekSpellingQuizListeners = makeQuizListeners(
         {
             scoreKeeper.increment();
         }
+        scoreKeeper.logAnswer(QuizType::Spelling, correct);
     });
 
 constexpr size_t greekWordBufferSize
@@ -212,6 +214,9 @@ auto sdCardChecker = makeSdCardChecker(
     [] { return SD.begin(SDCARD_SS_PIN, SDCARD_SPI); },
     [] { return digitalRead(SDCARD_DET_PIN) == LOW; });
 
+auto statsScreen = makeStatsScreen(
+    tft, scoreKeeper, settingsHolder, colors::Black, colors::White);
+
 auto mainMenuEntries = makeMenuEntries(
     MenuEntry{
         "Maths Quiz",
@@ -266,7 +271,24 @@ auto mainMenuEntries = makeMenuEntries(
             }
             return false; // Disable the main menu since we are now in settings
         }},
-    MenuEntry{"About"});
+    MenuEntry{
+        "Stats",
+        []
+        {
+            clearScreenExcludingButtonLabels();
+            const RectangleDimensions statsScreenLargeInTheMiddle{
+                tft.width() * 0.025F,
+                tft.height() / 5.0F,
+                tft.width() * 0.95F,
+                tft.height() * 0.58F,
+                5};
+            statsScreen.begin(statsScreenLargeInTheMiddle);
+            leftButtonLabel.clear();
+            middleButtonLabel.clear();
+            rightButtonLabel.draw("Esc");
+            statsScreen.draw();
+            return false; // Disable the main menu since we are now in stats
+        }});
 auto mainMenu = makeMenu(tft, mainMenuEntries, menuColors);
 
 auto buttonListeners = makeButtonListeners(
@@ -328,6 +350,23 @@ auto buttonListeners = makeButtonListeners(
             avKeyboard.enableKeyboard(false);
             evKeyboard.enableKeyboard(false);
             gammaKeyboard.enableKeyboard(false);
+            clearScreenExcludingButtonLabels();
+            mainMenu.enableMenu(true);
+            mainMenu.draw();
+            leftButtonLabel.draw("Sel");
+            middleButtonLabel.clear();
+            rightButtonLabel.clear();
+        }
+        return consumedEvent;
+    },
+    [](ButtonEvent event)
+    {
+        const auto consumedEvent = statsScreen.isEnabled();
+        const auto shouldExit
+            = event == ButtonEvent::Right && statsScreen.isEnabled();
+        if (shouldExit)
+        {
+            statsScreen.enableStatsScreen(false);
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();

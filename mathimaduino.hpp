@@ -22,6 +22,18 @@ inline void playTone(int halfPeriodUs, int durationMs)
     }
 }
 
+inline void playCoinTickSound()
+{
+    playTone(379, 10);
+}
+
+inline void playCoinSound()
+{
+    playTone(568, 60);  // A5  880 Hz
+    playTone(379, 60);  // E6  1319 Hz
+    playTone(284, 160); // A6  1760 Hz
+}
+
 inline void playCorrectSound()
 {
     playTone(1519, 120);
@@ -158,6 +170,18 @@ enum class ButtonEvent
     Left,
     Middle,
     Right
+};
+
+enum class QuizType
+{
+    Maths,
+    Spelling
+};
+
+struct QuizRecord
+{
+    int correct{};
+    int wrong{};
 };
 
 // Used for English characters and strings
@@ -835,19 +859,39 @@ public:
     {
     }
 
-    void increment(int amount = 1)
+    void increment()
     {
-        score_ += amount;
+        ++score_;
         draw();
     }
 
-    void decrement(int amount = 1)
+    void logAnswer(QuizType quizType, bool correct)
     {
-        if (score_ > 0)
+        auto& record
+            = (quizType == QuizType::Maths) ? mathsRecord_ : spellingRecord_;
+        if (correct)
         {
-            score_ -= amount;
+            ++record.correct;
         }
-        draw();
+        else
+        {
+            ++record.wrong;
+        }
+    }
+
+    int getScore() const
+    {
+        return score_;
+    }
+
+    QuizRecord getMathsRecord() const
+    {
+        return mathsRecord_;
+    }
+
+    QuizRecord getSpellingRecord() const
+    {
+        return spellingRecord_;
     }
 
     void draw()
@@ -861,6 +905,8 @@ private:
     Lbl& label_;
     TFT_eSPI& tft_;
     int score_{0};
+    QuizRecord mathsRecord_{};
+    QuizRecord spellingRecord_{};
     char scoreBuffer_[16] = {'\0'};
 };
 
@@ -2603,6 +2649,184 @@ makeGreekSpellingQuiz(TFT_eSPI& tft,
         tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
 }
 
-// TODO: Stats screen with a breakdown of the current run
-// TODO: Coin icon
+template<typename TFT_eSPI>
+void drawCoin(TFT_eSPI& tft, int x, int y, int radius)
+{
+    tft.fillCircle(x + 3, y + 3, radius, tft.color565(120, 90, 0));
+    tft.fillCircle(x, y, radius, tft.color565(255, 210, 30));
+    tft.drawCircle(x, y, radius, tft.color565(170, 130, 0));
+    tft.drawCircle(x, y, radius - 3, tft.color565(220, 180, 80));
+
+    tft.fillCircle(x - radius / 3,
+                   y - radius / 3,
+                   radius / 4,
+                   tft.color565(255, 240, 160));
+    tft.drawFastHLine(
+        x - radius + 8, y - 2, radius * 2 - 16, tft.color565(200, 160, 20));
+}
+
+template<typename TFT_eSPI, typename ScoreKeeperT, typename SettingsHolderT>
+class StatsScreen
+{
+public:
+    StatsScreen(TFT_eSPI& tft,
+                ScoreKeeperT& scoreKeeper,
+                SettingsHolderT& settingsHolder,
+                TftColor backgroundColor,
+                TftColor textColor)
+        : tft_{tft}
+        , scoreKeeper_{scoreKeeper}
+        , settingsHolder_{settingsHolder}
+        , backgroundColor_{makeColor(backgroundColor)}
+        , textColor_{makeColor(textColor)}
+    {
+    }
+
+    void begin(const RectangleDimensions& rect)
+    {
+        rect_ = rect;
+        enableStatsScreen(true);
+    }
+
+    void enableStatsScreen(bool enabled)
+    {
+        enabled_ = enabled;
+    }
+
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void draw()
+    {
+        if (!enabled_)
+        {
+            return;
+        }
+        drawStaticContent();
+        animateScoreCountUp();
+    }
+
+private:
+    TFT_eSPI& tft_;
+    ScoreKeeperT& scoreKeeper_;
+    SettingsHolderT& settingsHolder_;
+    int32_t backgroundColor_;
+    int32_t textColor_;
+
+    RectangleDimensions rect_{};
+    bool enabled_{false};
+
+    int coinX() const
+    {
+        return rect_.x0 + rect_.width / 2;
+    }
+
+    int coinY() const
+    {
+        return rect_.y0 + 38;
+    }
+
+    void drawScoreInCoin(int score)
+    {
+        char buf[6] = {'\0'}; // xxxxx + null terminator
+        snprintf(buf, sizeof(buf), "%d", score);
+
+        tft_.setTextColor(tft_.color565(110, 80, 0),
+                          tft_.color565(255, 210, 30));
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextSize(2);
+        tft_.setTextPadding(0);
+        tft_.drawString(buf, coinX() + 2, coinY(), defaultEngFont);
+    }
+
+    void drawStaticContent()
+    {
+        tft_.fillRect(
+            rect_.x0, rect_.y0, rect_.width, rect_.height, backgroundColor_);
+        tft_.drawRect(
+            rect_.x0, rect_.y0, rect_.width, rect_.height, textColor_);
+        // Top middle part of the rectangle draw the coin
+        constexpr int coinRadius = 28;
+        drawCoin(tft_, coinX(), coinY(), coinRadius);
+
+        tft_.setTextColor(textColor_, backgroundColor_);
+        tft_.setTextDatum(TL_DATUM);
+        tft_.setTextSize(2);
+        tft_.setTextPadding(0);
+        char buf[32]              = {'\0'}; // Large enough for large scores
+        const auto fontHeight     = tft_.fontHeight();
+        const auto xOffset        = rect_.x0 + 10;
+        const auto yOffset        = rect_.y0 + 80;
+        const auto mathsRecord    = scoreKeeper_.getMathsRecord();
+        const auto spellingRecord = scoreKeeper_.getSpellingRecord();
+        snprintf(buf,
+                 sizeof(buf),
+                 "Maths: %d/%d",
+                 mathsRecord.correct,
+                 mathsRecord.correct + mathsRecord.wrong);
+        tft_.drawString(buf, xOffset, yOffset, defaultEngFont);
+        snprintf(buf,
+                 sizeof(buf),
+                 "Spelling: %d/%d",
+                 spellingRecord.correct,
+                 spellingRecord.correct + spellingRecord.wrong);
+        tft_.drawString(buf, xOffset, yOffset + 2 * fontHeight, defaultEngFont);
+    }
+
+    void animateScoreCountUp()
+    {
+        const auto score = scoreKeeper_.getScore();
+        if (score <= 0)
+        {
+            drawScoreInCoin(0);
+            return;
+        }
+        const auto soundOn            = settingsHolder_.getSound();
+        constexpr int maxCountUpSteps = 18;
+        const auto steps = score < maxCountUpSteps ? score : maxCountUpSteps;
+        for (int step = 1; step <= steps; ++step)
+        {
+            // Last frame lands exactly on the score despite rounding
+            const int value
+                = static_cast<int>((static_cast<long>(score) * step) / steps);
+            drawScoreInCoin(value);
+            if (soundOn)
+            {
+                playCoinTickSound();
+            }
+            delay(stepDelayMs(step, steps));
+        }
+        if (soundOn)
+        {
+            playCoinSound();
+        }
+    }
+
+    static int stepDelayMs(int step, int steps)
+    {
+        // The last step lingers about twice as long as the first
+        const long weight    = steps + step; // 1x .. 2x
+        const long sumWeight = static_cast<long>(steps) * steps
+                               + static_cast<long>(steps) * (steps + 1) / 2;
+        // Budget for the delays of the whole count up, regardless of the score
+        constexpr long countUpDurationMs = 1200;
+        return static_cast<int>(countUpDurationMs * weight / sumWeight);
+    }
+};
+
+template<typename TFT_eSPI, typename ScoreKeeperT, typename SettingsHolderT>
+StatsScreen<TFT_eSPI, ScoreKeeperT, SettingsHolderT>
+makeStatsScreen(TFT_eSPI& tft,
+                ScoreKeeperT& scoreKeeper,
+                SettingsHolderT& settingsHolder,
+                TftColor backgroundColor,
+                TftColor textColor)
+{
+    return StatsScreen<TFT_eSPI, ScoreKeeperT, SettingsHolderT>{
+        tft, scoreKeeper, settingsHolder, backgroundColor, textColor};
+}
+
+// TODO: Coin icon next to score?
 // TODO: Lock settings with lock_settings.txt file
