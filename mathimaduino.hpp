@@ -494,7 +494,8 @@ auto makeKeyboard(TFT_eSPI& tft,
         tft, colors, labels, listeners};
 }
 
-using QuizListener = void (*)();
+/// Called when an answer is given in a quiz
+using QuizListener = void (*)(bool correct);
 
 template<typename... Listeners>
 struct QuizListeners
@@ -616,10 +617,7 @@ public:
                 {
                     playCorrectSound();
                 }
-                for (const auto& listener : listeners_.listeners)
-                {
-                    listener();
-                }
+                notifyQuizListeners(true);
                 drawNewQuestion();
             }
             else
@@ -629,6 +627,7 @@ public:
                 {
                     playWrongSound();
                 }
+                notifyQuizListeners(false);
                 questionBuffer_[userAnswerIndex_] = '\0';
                 tft_.setTextColor(textColor_, backgroundColor_);
                 tft_.setTextSize(3);
@@ -734,6 +733,14 @@ private:
             return MathsQuestion{0, 0, '+', 0};
         }
     }
+
+    void notifyQuizListeners(bool correct)
+    {
+        for (const auto& listener : listeners_.listeners)
+        {
+            listener(correct);
+        }
+    }
 };
 
 template<typename TFT_eSPI, typename Listeners, typename SettingsHolderT>
@@ -828,15 +835,18 @@ public:
     {
     }
 
-    void increment()
+    void increment(int amount = 1)
     {
-        ++score_;
+        score_ += amount;
         draw();
     }
 
-    void decrement()
+    void decrement(int amount = 1)
     {
-        score_ = 0;
+        if (score_ > 0)
+        {
+            score_ -= amount;
+        }
         draw();
     }
 
@@ -2390,10 +2400,7 @@ public:
                 {
                     playCorrectSound();
                 }
-                for (const auto& listener : listeners_.listeners)
-                {
-                    listener();
-                }
+                notifyQuizListeners(true);
                 drawNewQuestion();
             }
             else
@@ -2402,6 +2409,7 @@ public:
                 {
                     playWrongSound();
                 }
+                notifyQuizListeners(false);
                 userInput_[0] = '\0';
                 prepareDisplayedWord();
                 drawWord();
@@ -2569,6 +2577,14 @@ private:
             = GreekSpellingCandidate{GreekHomophoneGroup::IotaSound, 2, 2};
         prepareDisplayedWord();
     }
+
+    void notifyQuizListeners(bool correct)
+    {
+        for (const auto& listener : listeners_.listeners)
+        {
+            listener(correct);
+        }
+    }
 };
 
 template<typename TFT_eSPI,
@@ -2586,3 +2602,7 @@ makeGreekSpellingQuiz(TFT_eSPI& tft,
     return GreekSpellingQuiz<TFT_eSPI, Listeners, SettingsHolderT, FileReaderT>{
         tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
 }
+
+// TODO: Stats screen with a breakdown of the current run
+// TODO: Coin icon
+// TODO: Lock settings with lock_settings.txt file

@@ -26,7 +26,14 @@ const TftColor screenBackgroundColor = colors::Red;
 auto scoreLabel
     = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 3);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
-auto mathsQuizListeners = makeQuizListeners([] { scoreKeeper.increment(); });
+auto mathsQuizListeners = makeQuizListeners(
+    [](bool correct)
+    {
+        if (correct)
+        {
+            scoreKeeper.increment();
+        }
+    });
 SettingsHolder settingsHolder{};
 auto mathsQuiz             = makeMathsQuiz(tft,
                                screenBackgroundColor,
@@ -59,8 +66,14 @@ const auto clearScreenExcludingButtonLabels = []
                       makeColor(screenBackgroundColor));
 };
 
-auto greekSpellingQuizListeners
-    = makeQuizListeners([] { scoreKeeper.increment(); });
+auto greekSpellingQuizListeners = makeQuizListeners(
+    [](bool correct)
+    {
+        if (correct)
+        {
+            scoreKeeper.increment();
+        }
+    });
 
 constexpr size_t greekWordBufferSize
     = maxGreekWordLetters * sizeof(uint16_t) + 1
