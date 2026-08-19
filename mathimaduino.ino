@@ -179,13 +179,17 @@ auto settingsEntries = makeSettingsEntries(
                   "operations_count.txt",
                   [](auto v) { settingsHolder.setOperationsCount(v); }},
     SettingsEntry{MenuEntry{"Language"},
-                  makeMenuEntryConfig("Greek", "English"),
+                  makeMenuEntryConfig("Greek"),
                   "language.txt",
                   [](auto v) { settingsHolder.setLanguage(v); }},
     SettingsEntry{MenuEntry{"Max word length"},
                   makeMenuEntryConfig("5", "10", "15"),
                   "max_word_length.txt",
-                  [](auto v) { settingsHolder.setMaxWordLength(v); }});
+                  [](auto v) { settingsHolder.setMaxWordLength(v); }},
+    SettingsEntry{MenuEntry{"Sound"},
+                  makeMenuEntryConfig("On", "Off"),
+                  "sound.txt",
+                  [](auto v) { settingsHolder.setSound(v); }});
 
 auto settingsMenu = makeSettingsMenu(tft, settingsEntries, menuColors);
 auto persistentSettings

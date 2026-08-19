@@ -612,7 +612,10 @@ public:
             if (userAnswer == currentCorrectAnswer_)
             {
                 // Correct answer, draw a new question
-                playCorrectSound();
+                if (settingsHolder_.getSound())
+                {
+                    playCorrectSound();
+                }
                 for (const auto& listener : listeners_.listeners)
                 {
                     listener();
@@ -622,7 +625,10 @@ public:
             else
             {
                 // Incorrect answer, clear the user input
-                playWrongSound();
+                if (settingsHolder_.getSound())
+                {
+                    playWrongSound();
+                }
                 questionBuffer_[userAnswerIndex_] = '\0';
                 tft_.setTextColor(textColor_, backgroundColor_);
                 tft_.setTextSize(3);
@@ -1341,12 +1347,30 @@ public:
         maxWordLength_ = atoi(value);
     }
 
+    void setSound(const char* value)
+    {
+        if (strcmp(value, "Off") == 0 || strcmp(value, "0") == 0)
+        {
+            sound_ = 0;
+        }
+        else
+        {
+            sound_ = 1; // Default to On
+        }
+    }
+
+    int getSound() const
+    {
+        return sound_;
+    }
+
 private:
     int maxOperandValue_{};
     int maxResultValue_{};
     int operationsCount_{};
     Language language_{};
     int maxWordLength_{};
+    int sound_{};
 };
 
 template<typename TFT_eSPI, typename Settings>
@@ -2362,7 +2386,10 @@ public:
         case ButtonEvent::Left:
             if (isAnswerCorrect())
             {
-                playCorrectSound();
+                if (settingsHolder_.getSound())
+                {
+                    playCorrectSound();
+                }
                 for (const auto& listener : listeners_.listeners)
                 {
                     listener();
@@ -2371,7 +2398,10 @@ public:
             }
             else
             {
-                playWrongSound();
+                if (settingsHolder_.getSound())
+                {
+                    playWrongSound();
+                }
                 userInput_[0] = '\0';
                 prepareDisplayedWord();
                 drawWord();
