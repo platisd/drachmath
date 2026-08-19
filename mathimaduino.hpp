@@ -2580,16 +2580,9 @@ makeGreekSpellingQuiz(TFT_eSPI& tft,
                       Listeners& listeners,
                       SettingsHolderT& settingsHolder,
                       FileReaderT& fileReader,
-                      // KeyboardDrawer KeyboardDrawer,
                       TftColor backgroundColor,
                       TftColor textColor)
 {
     return GreekSpellingQuiz<TFT_eSPI, Listeners, SettingsHolderT, FileReaderT>{
-        tft,
-        listeners,
-        settingsHolder,
-        fileReader,
-        // KeyboardDrawer,
-        backgroundColor,
-        textColor};
+        tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
 }
