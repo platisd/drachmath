@@ -223,24 +223,24 @@ auto mainMenuEntries = makeMenuEntries(
         []
         {
             clearScreenExcludingButtonLabels();
+            middleButtonLabel.draw("Del");
+            rightButtonLabel.draw("Esc");
             mathKeyboard.begin(keyboardAtBottom);
             mathKeyboard.draw();
             mathsQuiz.begin(quizAboveKeyboardInTheMiddle);
             mathsQuiz.drawNewQuestion();
-            middleButtonLabel.draw("Del");
-            rightButtonLabel.draw("Esc");
             return false; // Disable the main menu since we are now in the quiz
         }},
     MenuEntry{
         "Spelling Quiz",
         []
         {
-            tft.loadFont("ubuntu-greek-latin-32");
             clearScreenExcludingButtonLabels();
-            greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
-            greekSpellingQuiz.drawNewQuestion();
             middleButtonLabel.draw("Del");
             rightButtonLabel.draw("Esc");
+            tft.loadFont("ubuntu-greek-latin-32");
+            greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
+            greekSpellingQuiz.drawNewQuestion();
             drawGreekKeyboard(greekSpellingQuiz.getCurrentProblemHomophone());
             return false; // Disable the main menu since we are now in the quiz
         }},
