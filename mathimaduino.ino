@@ -491,10 +491,10 @@ void setup()
            tft.width(),
            tft.height() - 25, // Roughly the height of the button labels
            0};
-    const RectangleDimensions menuInTheMiddle{tft.width() / 5.5F,
-                                              tft.height() / 5.0F,
-                                              tft.width() / 1.50F,
-                                              tft.height() / 3.0F,
+    const RectangleDimensions menuInTheMiddle{tft.width() * 0.2F,
+                                              tft.height() * 0.33F,
+                                              tft.width() * 0.6F,
+                                              tft.height() * 0.33F,
                                               5};
     mainMenu.begin(menuInTheMiddle);
     mainMenu.draw();
