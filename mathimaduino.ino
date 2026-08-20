@@ -216,6 +216,7 @@ auto sdCardChecker = makeSdCardChecker(
     []
     {
         persistentSettings.load();
+        tft.unloadFont(); // Just in case
         tft.loadFont("ubuntu-greek-latin-32");
         ScopedGreekFont greekFontQuickUnloader{tft};
         auto lockFileReader = makeFileReader<16>("lock_settings.txt", SD);
