@@ -1045,7 +1045,7 @@ public:
         const auto currentTime = millis();
         if (lastNavigationEvent_ != NavigationEvent::None)
         {
-            if (currentTime - lastNavigationEventTime_ > debounceDelay_)
+            if (currentTime - lastNavigationEventTime_ > debounceDelayMs_)
             {
                 for (const auto& listener : navigationListeners_.listeners)
                 {
@@ -1060,7 +1060,7 @@ public:
         }
         if (lastButtonEvent_ != ButtonEvent::None)
         {
-            if (currentTime - lastButtonEventTime_ > debounceDelay_)
+            if (currentTime - lastButtonEventTime_ > debounceDelayMs_)
             {
                 for (const auto& listener : buttonListeners_.listeners)
                 {
@@ -1079,7 +1079,7 @@ public:
             // Longer debounce needed for polling at LOW state (opposed to an
             // edge) because the button is held down "longer" than a single edge
             // event.
-            if (currentTime - lastButtonEventTime_ > debounceDelay_ * 5)
+            if (currentTime - lastButtonEventTime_ > debounceDelayMs_ * 5)
             {
                 lastButtonEventTime_ = currentTime;
                 for (const auto& listener : buttonListeners_.listeners)
@@ -1102,7 +1102,7 @@ private:
     volatile unsigned long lastNavigationEventTime_{0};
     volatile ButtonEvent lastButtonEvent_{ButtonEvent::None};
     volatile unsigned long lastButtonEventTime_{0};
-    constexpr static unsigned long debounceDelay_{50}; // milliseconds
+    constexpr static unsigned long debounceDelayMs_{50};
 };
 
 template<typename NavigationListeners, typename ButtonListeners>
@@ -1964,7 +1964,7 @@ public:
     void handleSdCardActivity(bool forceCheck = false)
     {
         const auto currentTime = millis();
-        if (!forceCheck && currentTime - lastCheckTime_ < debounceDelay_)
+        if (!forceCheck && currentTime - lastCheckTime_ < debounceDelayMs_)
         {
             return;
         }
@@ -2017,7 +2017,7 @@ private:
     bool sdCardPresent_{false};
     bool sdCardReadyToUse_{false};
     unsigned long lastCheckTime_{0};
-    constexpr static unsigned long debounceDelay_{333}; // milliseconds
+    constexpr static unsigned long debounceDelayMs_{333};
 };
 
 template<typename TestFileWriter>
