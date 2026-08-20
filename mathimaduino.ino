@@ -22,7 +22,7 @@ void warnNoSdCard(int x0,
     tft.drawString("No SD card: Will lose settings on power off", x0, y0);
 }
 
-const TftColor screenBackgroundColor = colors::Red;
+const TftColor screenBackgroundColor = colors::Teal;
 auto scoreLabel
     = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 3);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
@@ -46,7 +46,7 @@ auto mathKeyboardListeners = makeKeyboardListeners(
 auto mathKeyboardLabels
     = makeKeyLabels('1', '2', '3', '4', '5', '6', '7', '8', '9', '0');
 const KeyColors keyboardColors
-    = {colors::White, colors::Black, colors::Green, colors::Gray};
+    = {colors::White, colors::Black, colors::Navy, colors::Gray};
 auto mathKeyboard = makeKeyboard<2, 5>(
     tft, keyboardColors, mathKeyboardLabels, mathKeyboardListeners);
 auto leftButtonLabel
@@ -179,7 +179,7 @@ const auto drawGreekKeyboard = [](GreekHomophoneGroup group)
 };
 
 const KeyColors menuColors
-    = {colors::White, colors::Black, colors::Green, colors::Gray};
+    = {colors::White, colors::Black, colors::Navy, colors::Gray};
 auto settingsEntries = makeSettingsEntries(
     SettingsEntry{MenuEntry{"Max operand value"},
                   makeMenuEntryConfig("10", "100"),
