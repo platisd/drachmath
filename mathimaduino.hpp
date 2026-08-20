@@ -2951,11 +2951,16 @@ public:
         chargeLevelWidth_  = clamp0(bodyWidth_ - padding_ * 2);
         chargeLevelX_      = x0_ + padding_;
         chargeLevelY_      = y0_ + padding_;
+        enableBatteryIndicator(true);
         draw(true);
     }
 
     void update()
     {
+        if (!enabled_)
+        {
+            return;
+        }
         const auto currentTime = millis();
         if (currentTime - lastMeasurementTime_ < measurementIntervalMs)
         {
@@ -2967,6 +2972,10 @@ public:
 
     void draw(bool redrawStaticContent = true)
     {
+        if (!enabled_)
+        {
+            return;
+        }
         if (redrawStaticContent)
         {
             drawStaticContent();
@@ -2977,6 +2986,10 @@ public:
 
     void hide()
     {
+        if (!enabled_)
+        {
+            return;
+        }
         tft_.fillRect(
             x0_, y0_, bodyWidth_ + terminalWidth_, height_, backgroundColor_);
     }
@@ -3003,8 +3016,14 @@ private:
     int chargeLevelY_{};
 
     unsigned long lastMeasurementTime_{0UL};
+    bool enabled_{};
 
     constexpr static unsigned long measurementIntervalMs{60 * 1000}; // 1 minute
+
+    void enableBatteryIndicator(bool enabled)
+    {
+        enabled_ = enabled;
+    }
 
     void drawStaticContent()
     {

@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <Seeed_FS.h>
+#include <SparkFunBQ27441.h>
 
 #include "SD/Seeed_SD.h"
 
@@ -225,8 +226,8 @@ auto sdCardChecker = makeSdCardChecker(
 auto statsScreen = makeStatsScreen(
     tft, scoreKeeper, settingsHolder, colors::Black, colors::White);
 
-auto batteryIndicator
-    = makeBatteryIndicator(tft, [] { return 10; }, screenBgColor);
+auto batteryIndicator = makeBatteryIndicator(
+    tft, [] { return static_cast<int>(lipo.soc()); }, screenBgColor);
 
 auto mainMenuEntries = makeMenuEntries(
     MenuEntry{
@@ -509,7 +510,11 @@ void setup()
         tft.textWidth("XXXX"),
         tft.fontHeight(defaultEngFont),
         0};
-    batteryIndicator.begin(batteryIndicatorUnderScoreLabel);
+    if (lipo.begin())
+    {
+        lipo.setCapacity(650); // Battery capacity for Wio Terminal
+        batteryIndicator.begin(batteryIndicatorUnderScoreLabel);
+    }
     const auto bottomOfBatteryIndicator
         = batteryIndicatorUnderScoreLabel.y0
           + batteryIndicatorUnderScoreLabel.height;
