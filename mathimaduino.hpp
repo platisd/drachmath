@@ -139,6 +139,16 @@ struct Point
 
 struct RectangleDimensions
 {
+    RectangleDimensions() = default;
+    RectangleDimensions(int x, int y, int w, int h, int r)
+        : x0{x}
+        , y0{y}
+        , width{w}
+        , height{h}
+        , radius{r}
+    {
+    }
+
     int x0{};
     int y0{};
     int width{};
@@ -2906,4 +2916,159 @@ makeStatsScreen(TFT_eSPI& tft,
 {
     return StatsScreen<TFT_eSPI, ScoreKeeperT, SettingsHolderT>{
         tft, scoreKeeper, settingsHolder, backgroundColor, textColor};
+}
+
+/// Return battery level as a percentage (0-100)
+using BatteryLevelProvider = int (*)();
+
+template<typename TFT_eSPI>
+class BatteryIndicator
+{
+public:
+    BatteryIndicator(TFT_eSPI& tft,
+                     BatteryLevelProvider batteryLevelProvider,
+                     TftColor backgroundColor)
+        : tft_{tft}
+        , getBatteryLevel_{batteryLevelProvider}
+        , backgroundColor_{makeColor(backgroundColor)}
+    {
+    }
+
+    void begin(const RectangleDimensions& rect)
+    {
+        x0_                = rect.x0;
+        y0_                = rect.y0;
+        height_            = rect.height;
+        terminalWidth_     = rect.width / 10;
+        terminalHeight_    = rect.height / 3;
+        bodyWidth_         = rect.width - terminalWidth_;
+        padding_           = rect.width / 20;
+        outline_           = tft_.color565(240, 240, 240);
+        empty_             = tft_.color565(45, 45, 45);
+        terminalX_         = x0_ + bodyWidth_;
+        terminalY_         = y0_ + (height_ - terminalHeight_) / 2;
+        chargeLevelHeight_ = clamp0(height_ - padding_ * 2);
+        chargeLevelWidth_  = clamp0(bodyWidth_ - padding_ * 2);
+        chargeLevelX_      = x0_ + padding_;
+        chargeLevelY_      = y0_ + padding_;
+        draw(true);
+    }
+
+    void update()
+    {
+        const auto currentTime = millis();
+        if (currentTime - lastMeasurementTime_ < measurementIntervalMs)
+        {
+            return;
+        }
+        lastMeasurementTime_ = currentTime;
+        draw(false); // Called from loop(), no need to redraw everything
+    }
+
+    void draw(bool redrawStaticContent = true)
+    {
+        if (redrawStaticContent)
+        {
+            drawStaticContent();
+        }
+        const auto batteryLevel = getBatteryLevel_();
+        drawChargeLevel(batteryLevel);
+    }
+
+    void hide()
+    {
+        tft_.fillRect(
+            x0_, y0_, bodyWidth_ + terminalWidth_, height_, backgroundColor_);
+    }
+
+private:
+    TFT_eSPI& tft_;
+    BatteryLevelProvider getBatteryLevel_;
+    int32_t backgroundColor_;
+
+    int x0_{};
+    int y0_{};
+    int height_{};
+    int terminalX_{};
+    int terminalY_{};
+    int terminalWidth_{};
+    int terminalHeight_{};
+    int bodyWidth_{};
+    int padding_{};
+    int outline_{};
+    int empty_{};
+    int chargeLevelHeight_{};
+    int chargeLevelWidth_{};
+    int chargeLevelX_{};
+    int chargeLevelY_{};
+
+    unsigned long lastMeasurementTime_{0UL};
+
+    constexpr static unsigned long measurementIntervalMs{60 * 1000}; // 1 minute
+
+    void drawStaticContent()
+    {
+        // Battery body
+        tft_.fillRect(x0_, y0_, bodyWidth_, height_, empty_);
+        tft_.drawRect(x0_, y0_, bodyWidth_, height_, outline_);
+        // Terminal
+        tft_.fillRect(
+            terminalX_, terminalY_, terminalWidth_, terminalHeight_, outline_);
+    }
+
+    void drawChargeLevel(int percentage)
+    {
+        int fillRed   = 40;
+        int fillGreen = 210;
+        if (percentage <= 20)
+        {
+            fillRed   = 230;
+            fillGreen = 40;
+        }
+        else if (percentage <= 50)
+        {
+            fillRed   = 240;
+            fillGreen = 180;
+        }
+        const int chargeColor = tft_.color565(fillRed, fillGreen, 40);
+        const int chargeWidth = chargeLevelWidth_ * percentage / 100;
+
+        if (chargeWidth > 0)
+        {
+            tft_.fillRect(chargeLevelX_,
+                          chargeLevelY_,
+                          chargeWidth,
+                          chargeLevelHeight_,
+                          chargeColor);
+            // Clear the rest of the charge level area to avoid artifacts
+            if (chargeWidth < chargeLevelWidth_)
+            {
+                tft_.fillRect(chargeLevelX_ + chargeWidth,
+                              chargeLevelY_,
+                              chargeLevelWidth_ - chargeWidth,
+                              chargeLevelHeight_,
+                              empty_);
+            }
+        }
+        else
+        {
+            // Clear the charge level area if the battery is empty
+            // which in practice should never happen, but just in case...
+            tft_.fillRect(chargeLevelX_,
+                          chargeLevelY_,
+                          chargeLevelWidth_,
+                          chargeLevelHeight_,
+                          empty_);
+        }
+    }
+};
+
+template<typename TFT_eSPI>
+BatteryIndicator<TFT_eSPI>
+makeBatteryIndicator(TFT_eSPI& tft,
+                     BatteryLevelProvider batteryLevelProvider,
+                     TftColor backgroundColor)
+{
+    return BatteryIndicator<TFT_eSPI>{
+        tft, batteryLevelProvider, backgroundColor};
 }

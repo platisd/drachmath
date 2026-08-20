@@ -22,9 +22,9 @@ void warnNoSdCard(int x0,
     tft.drawString("No SD card: Will lose settings on power off", x0, y0);
 }
 
-const TftColor screenBackgroundColor = colors::Teal;
+const TftColor screenBgColor = colors::Teal;
 auto scoreLabel
-    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 3);
+    = makeLabel(tft, colors::Black, colors::White, screenBgColor, 3);
 auto scoreKeeper        = makeScoreKeeper(scoreLabel, tft);
 auto mathsQuizListeners = makeQuizListeners(
     [](bool correct)
@@ -36,11 +36,8 @@ auto mathsQuizListeners = makeQuizListeners(
         scoreKeeper.logAnswer(QuizType::Maths, correct);
     });
 SettingsHolder settingsHolder{};
-auto mathsQuiz             = makeMathsQuiz(tft,
-                               screenBackgroundColor,
-                               colors::White,
-                               mathsQuizListeners,
-                               settingsHolder);
+auto mathsQuiz = makeMathsQuiz(
+    tft, screenBgColor, colors::White, mathsQuizListeners, settingsHolder);
 auto mathKeyboardListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
 auto mathKeyboardLabels
@@ -50,11 +47,11 @@ const KeyColors keyboardColors
 auto mathKeyboard = makeKeyboard<2, 5>(
     tft, keyboardColors, mathKeyboardLabels, mathKeyboardListeners);
 auto leftButtonLabel
-    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
+    = makeLabel(tft, colors::Black, colors::White, screenBgColor, 2);
 auto middleButtonLabel
-    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
+    = makeLabel(tft, colors::Black, colors::White, screenBgColor, 2);
 auto rightButtonLabel
-    = makeLabel(tft, colors::Black, colors::White, screenBackgroundColor, 2);
+    = makeLabel(tft, colors::Black, colors::White, screenBgColor, 2);
 RectangleDimensions
     screenAreaExcludingButtonLabels{}; // Will be initialized in setup()
 const auto clearScreenExcludingButtonLabels = []
@@ -64,7 +61,7 @@ const auto clearScreenExcludingButtonLabels = []
                       screenAreaExcludingButtonLabels.width,
                       screenAreaExcludingButtonLabels.height,
                       screenAreaExcludingButtonLabels.radius,
-                      makeColor(screenBackgroundColor));
+                      makeColor(screenBgColor));
 };
 
 auto greekSpellingQuizListeners = makeQuizListeners(
@@ -88,7 +85,7 @@ auto greekSpellingQuiz = makeGreekSpellingQuiz(tft,
                                                greekSpellingQuizListeners,
                                                settingsHolder,
                                                greekWordsFileReader,
-                                               screenBackgroundColor,
+                                               screenBgColor,
                                                colors::White);
 
 auto greekSpellingKeyboardListeners = makeKeyboardListeners(
@@ -228,6 +225,9 @@ auto sdCardChecker = makeSdCardChecker(
 auto statsScreen = makeStatsScreen(
     tft, scoreKeeper, settingsHolder, colors::Black, colors::White);
 
+auto batteryIndicator
+    = makeBatteryIndicator(tft, [] { return 10; }, screenBgColor);
+
 auto mainMenuEntries = makeMenuEntries(
     MenuEntry{
         "Maths Quiz",
@@ -260,7 +260,7 @@ auto mainMenuEntries = makeMenuEntries(
             clearScreenExcludingButtonLabels();
             const RectangleDimensions settingsMenuLargeInTheMiddle{
                 tft.width() * 0.025F,
-                tft.height() / 5.0F,
+                tft.height() * 0.33F,
                 tft.width() * 0.95F,
                 tft.height() * 0.5F,
                 5};
@@ -276,7 +276,7 @@ auto mainMenuEntries = makeMenuEntries(
                              1,
                              TC_DATUM,
                              colors::Black,
-                             screenBackgroundColor);
+                             screenBgColor);
             }
             return false; // Disable the main menu since we are now in settings
         }},
@@ -287,7 +287,7 @@ auto mainMenuEntries = makeMenuEntries(
             clearScreenExcludingButtonLabels();
             const RectangleDimensions statsScreenLargeInTheMiddle{
                 tft.width() * 0.025F,
-                tft.height() / 5.0F,
+                tft.height() * 0.25F,
                 tft.width() * 0.95F,
                 tft.height() * 0.58F,
                 5};
@@ -295,6 +295,7 @@ auto mainMenuEntries = makeMenuEntries(
             leftButtonLabel.clear();
             middleButtonLabel.clear();
             scoreKeeper.hide(); // We already show the score in stats
+            batteryIndicator.hide();
             rightButtonLabel.draw("Esc");
             statsScreen.draw();
             return false; // Disable the main menu since we are now in stats
@@ -381,6 +382,7 @@ auto buttonListeners = makeButtonListeners(
             mainMenu.draw();
             leftButtonLabel.draw("Sel");
             scoreKeeper.draw();
+            batteryIndicator.draw();
             middleButtonLabel.clear();
             rightButtonLabel.clear();
         }
@@ -476,8 +478,9 @@ void setup()
 
     tft.begin();
     tft.setRotation(3);
+    tft.setTextSize(2); // Explicit since it affects font height and width
 
-    tft.fillScreen(makeColor(screenBackgroundColor));
+    tft.fillScreen(makeColor(screenBgColor));
     // the button labels are on the top left of the screen and are a few pixels
     // large. They are roughly 10% of the screen away from each o ther
     leftButtonLabel.begin({tft.width() * 0.045F, 0});
@@ -486,12 +489,6 @@ void setup()
     rightButtonLabel.begin({tft.width() * 0.54F, 0});
     scoreLabel.begin({tft.width() - tft.textWidth("xx"), 0});
     scoreKeeper.draw();
-    screenAreaExcludingButtonLabels
-        = {0,
-           25, // Roughly the height of the button labels
-           tft.width(),
-           tft.height() - 25, // Roughly the height of the button labels
-           0};
     const RectangleDimensions menuInTheMiddle{tft.width() * 0.2F,
                                               tft.height() * 0.33F,
                                               tft.width() * 0.6F,
@@ -504,10 +501,29 @@ void setup()
         0, tft.height() * 2.0F / 3.0F, tft.width(), tft.height() / 3.0F, 5};
     quizAboveKeyboardInTheMiddle = RectangleDimensions{
         0, tft.height() / 3.0F, tft.width(), tft.height() / 3.0F, 5};
+
+    tft.setTextSize(2);
+    const RectangleDimensions batteryIndicatorUnderScoreLabel{
+        tft.width() - tft.textWidth("XXXX"),
+        tft.fontHeight(defaultEngFont) * 1.7F,
+        tft.textWidth("XXXX"),
+        tft.fontHeight(defaultEngFont),
+        0};
+    batteryIndicator.begin(batteryIndicatorUnderScoreLabel);
+    const auto bottomOfBatteryIndicator
+        = batteryIndicatorUnderScoreLabel.y0
+          + batteryIndicatorUnderScoreLabel.height;
+    screenAreaExcludingButtonLabels
+        = {0,
+           bottomOfBatteryIndicator, // The lowest button
+           tft.width(),
+           tft.height() - bottomOfBatteryIndicator,
+           0};
 }
 
 void loop()
 {
     inputHandler.handleEvents();
     sdCardChecker.handleSdCardActivity();
+    batteryIndicator.update();
 }
