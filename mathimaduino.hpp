@@ -1937,6 +1937,7 @@ makePersistentSettings(SettingsHolderT& settingsHolder,
 using SdCardInitializer = bool (*)();
 /// Returns true if SD card is present, false otherwise
 using SdCardPresentDetector = bool (*)();
+using OnSdCardReadyToUse    = void (*)();
 
 template<typename TestFileWriter>
 class SdCardChecker
@@ -1944,10 +1945,12 @@ class SdCardChecker
 public:
     SdCardChecker(TestFileWriter testFileWriter,
                   SdCardInitializer sdCardInitializer,
-                  SdCardPresentDetector sdCardPresentDetector)
+                  SdCardPresentDetector sdCardPresentDetector,
+                  OnSdCardReadyToUse onSdCardReadyToUse)
         : testFileWriter_{testFileWriter}
         , initializeSdCard_{sdCardInitializer}
         , isSdCardPresent_{sdCardPresentDetector}
+        , onSdCardReadyToUse_{onSdCardReadyToUse}
     {
     }
 
@@ -1971,6 +1974,21 @@ public:
         {
             return; // No change in SD card presence
         }
+
+        // From now on maybe the SD is ready to use, so run the exit callback
+        struct OnExitRunner
+        {
+            OnSdCardReadyToUse onSdCardReadyToUse_;
+            bool& sdCardReadyToUse_;
+            ~OnExitRunner()
+            {
+                if (sdCardReadyToUse_)
+                {
+                    onSdCardReadyToUse_();
+                }
+            }
+        } onExit{onSdCardReadyToUse_, sdCardReadyToUse_};
+
         sdCardPresent_ = present;
         if (!sdCardPresent_)
         {
@@ -1995,6 +2013,7 @@ private:
     TestFileWriter testFileWriter_;
     SdCardInitializer initializeSdCard_;
     SdCardPresentDetector isSdCardPresent_;
+    OnSdCardReadyToUse onSdCardReadyToUse_;
     bool sdCardPresent_{false};
     bool sdCardReadyToUse_{false};
     unsigned long lastCheckTime_{0};
@@ -2005,10 +2024,13 @@ template<typename TestFileWriter>
 SdCardChecker<TestFileWriter>
 makeSdCardChecker(TestFileWriter testFileWriter,
                   SdCardInitializer sdCardInitializer,
-                  SdCardPresentDetector sdCardPresentDetector)
+                  SdCardPresentDetector sdCardPresentDetector,
+                  OnSdCardReadyToUse onSdCardReadyToUse)
 {
-    return SdCardChecker<TestFileWriter>{
-        testFileWriter, sdCardInitializer, sdCardPresentDetector};
+    return SdCardChecker<TestFileWriter>{testFileWriter,
+                                         sdCardInitializer,
+                                         sdCardPresentDetector,
+                                         onSdCardReadyToUse};
 }
 
 constexpr size_t greekSpellingProblemTypeCount{3};

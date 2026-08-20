@@ -212,7 +212,13 @@ auto persistentSettings
 auto sdCardChecker = makeSdCardChecker(
     makeFileWriter("sd_card_test.txt", SD),
     [] { return SD.begin(SDCARD_SS_PIN, SDCARD_SPI); },
-    [] { return digitalRead(SDCARD_DET_PIN) == LOW; });
+    [] { return digitalRead(SDCARD_DET_PIN) == LOW; },
+    []
+    {
+        persistentSettings.load();
+        tft.loadFont("ubuntu-greek-latin-32");
+        ScopedGreekFont greekFontQuickUnloader{tft};
+    });
 
 auto statsScreen = makeStatsScreen(
     tft, scoreKeeper, settingsHolder, colors::Black, colors::White);
@@ -238,7 +244,6 @@ auto mainMenuEntries = makeMenuEntries(
             clearScreenExcludingButtonLabels();
             middleButtonLabel.draw("Del");
             rightButtonLabel.draw("Esc");
-            tft.loadFont("ubuntu-greek-latin-32");
             greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
             greekSpellingQuiz.drawNewQuestion();
             return false; // Disable the main menu since we are now in the quiz
@@ -342,7 +347,6 @@ auto buttonListeners = makeButtonListeners(
         if (shouldExit)
         {
             greekSpellingQuiz.enableQuiz(false);
-            tft.unloadFont();
             // Disable all keyboards just in case one of them is enabled
             epsilonKeyboard.enableKeyboard(false);
             iotaKeyboard.enableKeyboard(false);
@@ -464,10 +468,6 @@ void setup()
     attachInterrupts();
     Serial.begin(115200);
     sdCardChecker.begin();
-    if (sdCardChecker.isSdCardReadyToUse())
-    {
-        persistentSettings.load();
-    }
 
     tft.begin();
     tft.setRotation(3);
