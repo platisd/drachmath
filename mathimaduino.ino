@@ -241,7 +241,6 @@ auto mainMenuEntries = makeMenuEntries(
             tft.loadFont("ubuntu-greek-latin-32");
             greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
             greekSpellingQuiz.drawNewQuestion();
-            drawGreekKeyboard(greekSpellingQuiz.getCurrentProblemHomophone());
             return false; // Disable the main menu since we are now in the quiz
         }},
     MenuEntry{
