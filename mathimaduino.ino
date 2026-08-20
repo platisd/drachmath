@@ -285,6 +285,7 @@ auto mainMenuEntries = makeMenuEntries(
             statsScreen.begin(statsScreenLargeInTheMiddle);
             leftButtonLabel.clear();
             middleButtonLabel.clear();
+            scoreKeeper.hide(); // We already show the score in stats
             rightButtonLabel.draw("Esc");
             statsScreen.draw();
             return false; // Disable the main menu since we are now in stats
@@ -371,6 +372,7 @@ auto buttonListeners = makeButtonListeners(
             mainMenu.enableMenu(true);
             mainMenu.draw();
             leftButtonLabel.draw("Sel");
+            scoreKeeper.draw();
             middleButtonLabel.clear();
             rightButtonLabel.clear();
         }
@@ -478,7 +480,7 @@ void setup()
     leftButtonLabel.draw("Sel");
     middleButtonLabel.begin({tft.width() * 0.28F, 0});
     rightButtonLabel.begin({tft.width() * 0.54F, 0});
-    scoreLabel.begin({tft.width(), 0});
+    scoreLabel.begin({tft.width() - tft.textWidth("xx"), 0});
     scoreKeeper.draw();
     screenAreaExcludingButtonLabels
         = {0,

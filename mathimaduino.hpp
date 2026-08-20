@@ -803,17 +803,16 @@ public:
 
     void clear()
     {
-        if (labelBuffer_[0] == '\0')
+        if (drawnArea_.width == 0)
         {
             return;
         }
-        tft_.setTextSize(textSize_);
-        int textWidth  = tft_.textWidth(labelBuffer_);
-        int textHeight = tft_.fontHeight() * textSize_;
-        int x0         = clamp0(point_.x - textWidth / 2);
-        int y0         = clamp0(point_.y - textHeight / 2);
-        tft_.fillRect(x0, y0, textWidth, textHeight, clearColor_);
-        labelBuffer_[0] = '\0';
+        tft_.fillRect(drawnArea_.x0,
+                      drawnArea_.y0,
+                      drawnArea_.width,
+                      drawnArea_.height,
+                      clearColor_);
+        drawnArea_ = {};
     }
 
     void draw(const char* label)
@@ -825,6 +824,22 @@ public:
         tft_.drawString(label, point_.x, point_.y, defaultEngFont);
         strncpy(labelBuffer_, label, maxLabelLength - 1);
         labelBuffer_[maxLabelLength - 1] = '\0';
+        drawnArea_                       = calculateDrawnArea(label);
+    }
+
+    int getX() const
+    {
+        return point_.x;
+    }
+
+    int getY() const
+    {
+        return point_.y;
+    }
+
+    int getHeight() const
+    {
+        return tft_.fontHeight();
     }
 
 private:
@@ -834,8 +849,27 @@ private:
     int32_t clearColor_;
     int textSize_;
     Point point_{};
-    constexpr static size_t maxLabelLength = 5;
+    RectangleDimensions drawnArea_{};
+    constexpr static size_t maxLabelLength = 12; // xxxx + coin space + null
     char labelBuffer_[maxLabelLength]      = {'\0'};
+
+    RectangleDimensions calculateDrawnArea(const char* label) const
+    {
+        const int textWidth  = tft_.textWidth(label, defaultEngFont);
+        const int textHeight = tft_.fontHeight(defaultEngFont);
+        int x0               = clamp0(point_.x - textWidth / 2);
+        int y0               = clamp0(point_.y - textHeight / 2);
+        // TFT_eSPI::drawString shifts the string back on-screen
+        if (x0 + textWidth > tft_.width())
+        {
+            x0 = clamp0(tft_.width() - textWidth);
+        }
+        if (y0 + textHeight > tft_.height())
+        {
+            y0 = clamp0(tft_.height() - textHeight);
+        }
+        return RectangleDimensions{x0, y0, textWidth, textHeight, 0};
+    }
 };
 
 template<typename TFT_eSPI>
@@ -847,6 +881,22 @@ Label<TFT_eSPI> makeLabel(TFT_eSPI& tft,
 {
     return Label<TFT_eSPI>{
         tft, backgroundColor, textColor, clearColor, textSize};
+}
+
+template<typename TFT_eSPI>
+void drawCoin(TFT_eSPI& tft, int x, int y, int radius)
+{
+    tft.fillCircle(x + 3, y + 3, radius, tft.color565(120, 90, 0));
+    tft.fillCircle(x, y, radius, tft.color565(255, 210, 30));
+    tft.drawCircle(x, y, radius, tft.color565(170, 130, 0));
+    tft.drawCircle(x, y, radius - 3, tft.color565(220, 180, 80));
+
+    tft.fillCircle(x - radius / 3,
+                   y - radius / 3,
+                   radius / 4,
+                   tft.color565(255, 240, 160));
+    tft.drawFastHLine(
+        x - radius + 8, y - 2, radius * 2 - 16, tft.color565(200, 160, 20));
 }
 
 template<typename Lbl, typename TFT_eSPI>
@@ -896,9 +946,15 @@ public:
 
     void draw()
     {
-        tft_.setTextDatum(TR_DATUM);
-        snprintf(scoreBuffer_, sizeof(scoreBuffer_), "# %d", score_);
+        snprintf(scoreBuffer_, sizeof(scoreBuffer_), "%d  ", score_);
         label_.draw(scoreBuffer_);
+        int coinRadius = (label_.getHeight() / 2) * 0.9F;
+        drawCoin(tft_, tft_.width() - coinRadius, coinRadius, coinRadius);
+    }
+
+    void hide()
+    {
+        label_.clear();
     }
 
 private:
@@ -2649,22 +2705,6 @@ makeGreekSpellingQuiz(TFT_eSPI& tft,
         tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
 }
 
-template<typename TFT_eSPI>
-void drawCoin(TFT_eSPI& tft, int x, int y, int radius)
-{
-    tft.fillCircle(x + 3, y + 3, radius, tft.color565(120, 90, 0));
-    tft.fillCircle(x, y, radius, tft.color565(255, 210, 30));
-    tft.drawCircle(x, y, radius, tft.color565(170, 130, 0));
-    tft.drawCircle(x, y, radius - 3, tft.color565(220, 180, 80));
-
-    tft.fillCircle(x - radius / 3,
-                   y - radius / 3,
-                   radius / 4,
-                   tft.color565(255, 240, 160));
-    tft.drawFastHLine(
-        x - radius + 8, y - 2, radius * 2 - 16, tft.color565(200, 160, 20));
-}
-
 template<typename TFT_eSPI, typename ScoreKeeperT, typename SettingsHolderT>
 class StatsScreen
 {
@@ -2828,5 +2868,4 @@ makeStatsScreen(TFT_eSPI& tft,
         tft, scoreKeeper, settingsHolder, backgroundColor, textColor};
 }
 
-// TODO: Coin icon next to score?
 // TODO: Lock settings with lock_settings.txt file
