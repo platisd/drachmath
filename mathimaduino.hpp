@@ -1508,6 +1508,11 @@ public:
         return enabled_;
     }
 
+    void lockMenu(bool lock)
+    {
+        locked_ = lock;
+    }
+
     void begin(const RectangleDimensions& rect)
     {
         rect_ = rect;
@@ -1529,11 +1534,12 @@ public:
                            rect_.radius,
                            labelColor_); // Outline effect
         tft_.setTextSize(2);
-        // Draw each entry and config. Entry aligned to the left, config aligned
-        // to the right
+        // Draw each entry and config
+        // Entry aligned to the left, config aligned to the right
         for (size_t i = 0; i < settings_.size; ++i)
         {
-            drawEntry(i, i == selectedIndex_);
+            bool shouldHighlight = (i == selectedIndex_) && !locked_;
+            drawEntry(i, shouldHighlight);
         }
     }
 
@@ -1542,13 +1548,17 @@ public:
         tft_.setTextSize(2);
         // Redraw the previously selected entry with unselected color
         drawEntry(previousIndex, false);
-        // Draw the newly selected entry with selected color
-        drawEntry(selectedIndex_, true);
+        // Draw the newly selected entry with selected color (unless locked)
+        drawEntry(selectedIndex_, !locked_);
     }
 
     void handleNavigationEvent(NavigationEvent event)
     {
         if (!enabled_)
+        {
+            return;
+        }
+        if (locked_)
         {
             return;
         }
@@ -1614,6 +1624,7 @@ private:
     RectangleDimensions rect_{};
     size_t selectedIndex_{0};
     bool enabled_{false};
+    bool locked_{false};
     // Enough to contain the longest option as `<option>` + null terminator
     constexpr static size_t optionBufferSize = 16;
     char optionBuffer_[optionBufferSize];
@@ -1938,6 +1949,7 @@ using SdCardInitializer = bool (*)();
 /// Returns true if SD card is present, false otherwise
 using SdCardPresentDetector = bool (*)();
 using OnSdCardReadyToUse    = void (*)();
+using OnSdCardRemoved       = void (*)();
 
 template<typename TestFileWriter>
 class SdCardChecker
@@ -1946,11 +1958,13 @@ public:
     SdCardChecker(TestFileWriter testFileWriter,
                   SdCardInitializer sdCardInitializer,
                   SdCardPresentDetector sdCardPresentDetector,
-                  OnSdCardReadyToUse onSdCardReadyToUse)
+                  OnSdCardReadyToUse onSdCardReadyToUse,
+                  OnSdCardRemoved onSdCardRemoved)
         : testFileWriter_{testFileWriter}
         , initializeSdCard_{sdCardInitializer}
         , isSdCardPresent_{sdCardPresentDetector}
         , onSdCardReadyToUse_{onSdCardReadyToUse}
+        , onSdCardRemoved_{onSdCardRemoved}
     {
     }
 
@@ -1992,6 +2006,7 @@ public:
         sdCardPresent_ = present;
         if (!sdCardPresent_)
         {
+            onSdCardRemoved_();
             sdCardReadyToUse_ = false;
             return;
         }
@@ -2014,6 +2029,7 @@ private:
     SdCardInitializer initializeSdCard_;
     SdCardPresentDetector isSdCardPresent_;
     OnSdCardReadyToUse onSdCardReadyToUse_;
+    OnSdCardRemoved onSdCardRemoved_;
     bool sdCardPresent_{false};
     bool sdCardReadyToUse_{false};
     unsigned long lastCheckTime_{0};
@@ -2025,12 +2041,14 @@ SdCardChecker<TestFileWriter>
 makeSdCardChecker(TestFileWriter testFileWriter,
                   SdCardInitializer sdCardInitializer,
                   SdCardPresentDetector sdCardPresentDetector,
-                  OnSdCardReadyToUse onSdCardReadyToUse)
+                  OnSdCardReadyToUse onSdCardReadyToUse,
+                  OnSdCardRemoved onSdCardRemoved)
 {
     return SdCardChecker<TestFileWriter>{testFileWriter,
                                          sdCardInitializer,
                                          sdCardPresentDetector,
-                                         onSdCardReadyToUse};
+                                         onSdCardReadyToUse,
+                                         onSdCardRemoved};
 }
 
 constexpr size_t greekSpellingProblemTypeCount{3};
@@ -2889,5 +2907,3 @@ makeStatsScreen(TFT_eSPI& tft,
     return StatsScreen<TFT_eSPI, ScoreKeeperT, SettingsHolderT>{
         tft, scoreKeeper, settingsHolder, backgroundColor, textColor};
 }
-
-// TODO: Lock settings with lock_settings.txt file

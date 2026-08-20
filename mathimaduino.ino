@@ -218,7 +218,11 @@ auto sdCardChecker = makeSdCardChecker(
         persistentSettings.load();
         tft.loadFont("ubuntu-greek-latin-32");
         ScopedGreekFont greekFontQuickUnloader{tft};
-    });
+        auto lockFileReader = makeFileReader<16>("lock_settings.txt", SD);
+        auto line           = lockFileReader.readLine();
+        settingsMenu.lockMenu(line && strcmp(line, "1") == 0);
+    },
+    [] { SD.end(); });
 
 auto statsScreen = makeStatsScreen(
     tft, scoreKeeper, settingsHolder, colors::Black, colors::White);
