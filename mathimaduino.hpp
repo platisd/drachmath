@@ -315,7 +315,9 @@ public:
         , labels_{labels}
         , listeners_{listeners}
     {
-        static_assert(Labels::size == Rows * Columns,
+        static_assert(Rows * Columns != 0,
+                      "Rows and Columns must be greater than 0");
+        static_assert(Labels::size <= Rows * Columns,
                       "Number of labels must match Rows * Columns");
     }
 
@@ -1127,16 +1129,24 @@ makeInputHandler(NavigationListeners navigationListeners,
 /// @return true if the menu should remain enabled, false if it should be
 /// disabled
 using MenuEntryCallback = bool (*)();
+/// Optional callback to update the menu entry before drawing it
+struct MenuEntry;
+using MaybeUpdateMenuEntry = void (*)(MenuEntry&);
+
 struct MenuEntry
 {
     MenuEntry(
-        const char* label, MenuEntryCallback onPress = [] { return true; })
+        const char* label,
+        MenuEntryCallback onPress        = [] { return true; },
+        MaybeUpdateMenuEntry maybeUpdate = [](MenuEntry&) {})
         : label{label}
         , onPress{onPress}
+        , maybeUpdate{maybeUpdate}
     {
     }
     const char* label{};
     MenuEntryCallback onPress{};
+    MaybeUpdateMenuEntry maybeUpdate{};
 };
 
 template<typename... Entries>
@@ -1250,6 +1260,10 @@ public:
                            rect_.height,
                            rect_.radius,
                            labelColor_); // Outline effect
+        for (auto& entry : entries_.entries)
+        {
+            entry.maybeUpdate(entry);
+        }
         tft_.setTextSize(2);
         tft_.setTextDatum(MC_DATUM);
         tft_.setTextPadding(getTextPadding());
@@ -1309,10 +1323,9 @@ private:
     int getTextPadding() const
     {
         int maxWidth = 0;
-        for (size_t i = 0; i < entries_.size; ++i)
+        for (const auto& entry : entries_.entries)
         {
-            const auto& entry = entries_.entries[i];
-            const int width   = tft_.textWidth(entry.label);
+            const int width = tft_.textWidth(entry.label);
             if (width > maxWidth)
             {
                 maxWidth = width;

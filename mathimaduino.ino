@@ -176,6 +176,21 @@ const auto drawGreekKeyboard = [](GreekHomophoneGroup group)
     }
 };
 
+// clang-format off
+auto englishKeyboardLabels = makeKeyLabels('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+                                          'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+                                          'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+                                          'y', 'z');
+// clang-format on
+
+auto englishKeyboardListeners = makeKeyboardListeners(
+    [](char key)
+    {
+        // englishSpellingQuiz.handleKeyboardPress(key);
+    });
+auto englishKeyboard = makeKeyboard<3, 9>(
+    tft, keyboardColors, englishKeyboardLabels, englishKeyboardListeners);
+
 const KeyColors menuColors
     = {colors::White, colors::Black, colors::Navy, colors::Gray};
 auto settingsEntries = makeSettingsEntries(
@@ -192,7 +207,7 @@ auto settingsEntries = makeSettingsEntries(
                   "operations_count.txt",
                   [](auto v) { settingsHolder.setOperationsCount(v); }},
     SettingsEntry{MenuEntry{"Language"},
-                  makeMenuEntryConfig("Greek"),
+                  makeMenuEntryConfig("Greek", "English"),
                   "language.txt",
                   [](auto v) { settingsHolder.setLanguage(v); }},
     SettingsEntry{MenuEntry{"Max word length"},
@@ -244,15 +259,34 @@ auto mainMenuEntries = makeMenuEntries(
             return false; // Disable the main menu since we are now in the quiz
         }},
     MenuEntry{
-        "Spelling Quiz",
+        "", // Label updated based on the language setting
         []
         {
             clearScreenExcludingButtonLabels();
             middleButtonLabel.draw("Del");
             rightButtonLabel.draw("Esc");
-            greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
-            greekSpellingQuiz.drawNewQuestion();
+            if (settingsHolder.getLanguage() == Language::Greek)
+            {
+                greekSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
+                greekSpellingQuiz.drawNewQuestion();
+            }
+            else
+            {
+                englishKeyboard.begin(keyboardAtBottom);
+                englishKeyboard.draw();
+            }
             return false; // Disable the main menu since we are now in the quiz
+        },
+        [](MenuEntry& self)
+        {
+            if (settingsHolder.getLanguage() == Language::Greek)
+            {
+                self.label = "Greek Quiz";
+            }
+            else
+            {
+                self.label = "English Quiz";
+            }
         }},
     MenuEntry{
         "Settings",
@@ -422,6 +456,12 @@ auto navigationListeners = makeNavigationListeners(
         avKeyboard.handleNavigationEvent(event);
         evKeyboard.handleNavigationEvent(event);
         gammaKeyboard.handleNavigationEvent(event);
+        return consumedEvent;
+    },
+    [](NavigationEvent event)
+    {
+        const auto consumedEvent = englishKeyboard.isEnabled();
+        englishKeyboard.handleNavigationEvent(event);
         return consumedEvent;
     });
 auto inputHandler = makeInputHandler(navigationListeners, buttonListeners);
