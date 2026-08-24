@@ -72,7 +72,7 @@ auto greekSpellingQuizListeners = makeQuizListeners(
         {
             scoreKeeper.increment();
         }
-        scoreKeeper.logAnswer(QuizType::Spelling, correct);
+        scoreKeeper.logAnswer(QuizType::GreekSpelling, correct);
     });
 
 constexpr size_t greekWordBufferSize
@@ -183,11 +183,30 @@ auto englishKeyboardLabels = makeKeyLabels('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h
                                           'y', 'z');
 // clang-format on
 
-auto englishKeyboardListeners = makeKeyboardListeners(
-    [](char key)
+auto englishSpellingQuizListeners = makeQuizListeners(
+    [](bool correct)
     {
-        // englishSpellingQuiz.handleKeyboardPress(key);
+        if (correct)
+        {
+            scoreKeeper.increment();
+        }
+        scoreKeeper.logAnswer(QuizType::EnglishSpelling, correct);
     });
+
+auto englishWordsFileReader
+    = makeFileReader<maxEnglishSentenceLength + maxEnglishWordLength
+                     + 1 /* tab */ + 1 /* null */>("english_words.txt", SD);
+
+auto englishSpellingQuiz = makeEnglishSpellingQuiz(tft,
+                                                   englishSpellingQuizListeners,
+                                                   settingsHolder,
+                                                   englishWordsFileReader,
+                                                   screenBgColor,
+                                                   colors::White);
+
+auto englishKeyboardListeners = makeKeyboardListeners(
+    [](char key) { englishSpellingQuiz.handleKeyboardPress(key); });
+
 auto englishKeyboard = makeKeyboard<3, 9>(
     tft, keyboardColors, englishKeyboardLabels, englishKeyboardListeners);
 
@@ -259,7 +278,7 @@ auto mainMenuEntries = makeMenuEntries(
             return false; // Disable the main menu since we are now in the quiz
         }},
     MenuEntry{
-        "", // Label updated based on the language setting
+        "", // <Greek/English> Quiz
         []
         {
             clearScreenExcludingButtonLabels();
@@ -274,6 +293,8 @@ auto mainMenuEntries = makeMenuEntries(
             {
                 englishKeyboard.begin(keyboardAtBottom);
                 englishKeyboard.draw();
+                englishSpellingQuiz.begin(quizAboveKeyboardInTheMiddle);
+                englishSpellingQuiz.drawNewQuestion();
             }
             return false; // Disable the main menu since we are now in the quiz
         },
@@ -322,9 +343,9 @@ auto mainMenuEntries = makeMenuEntries(
             clearScreenExcludingButtonLabels();
             const RectangleDimensions statsScreenLargeInTheMiddle{
                 tft.width() * 0.025F,
-                tft.height() * 0.25F,
+                tft.height() * 0.20F,
                 tft.width() * 0.95F,
-                tft.height() * 0.58F,
+                tft.height() * 0.64F,
                 5};
             statsScreen.begin(statsScreenLargeInTheMiddle);
             leftButtonLabel.clear();
@@ -395,6 +416,23 @@ auto buttonListeners = makeButtonListeners(
             avKeyboard.enableKeyboard(false);
             evKeyboard.enableKeyboard(false);
             gammaKeyboard.enableKeyboard(false);
+            clearScreenExcludingButtonLabels();
+            mainMenu.enableMenu(true);
+            mainMenu.draw();
+            leftButtonLabel.draw("Sel");
+            middleButtonLabel.clear();
+            rightButtonLabel.clear();
+        }
+        return consumedEvent;
+    },
+    [](ButtonEvent event)
+    {
+        const auto consumedEvent = englishSpellingQuiz.isEnabled();
+        const auto shouldExit    = englishSpellingQuiz.handleButtonEvent(event);
+        if (shouldExit)
+        {
+            englishKeyboard.enableKeyboard(false);
+            englishSpellingQuiz.enableQuiz(false);
             clearScreenExcludingButtonLabels();
             mainMenu.enableMenu(true);
             mainMenu.draw();

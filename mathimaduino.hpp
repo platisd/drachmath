@@ -185,7 +185,8 @@ enum class ButtonEvent
 enum class QuizType
 {
     Maths,
-    Spelling
+    GreekSpelling,
+    EnglishSpelling
 };
 
 struct QuizRecord
@@ -567,7 +568,7 @@ public:
     MathsQuiz(TFT_eSPI& tft,
               TftColor backgroundColor,
               TftColor textColor,
-              Listeners listeners,
+              Listeners& listeners,
               SettingsHolderT& settingsHolder)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
@@ -617,6 +618,10 @@ public:
 
     void handleKeyboardPress(char key)
     {
+        if (!enabled_)
+        {
+            return;
+        }
         size_t currentLength = strlen(questionBuffer_);
         if (currentLength < questionBufferSize - 1)
         {
@@ -709,7 +714,7 @@ private:
     TFT_eSPI& tft_;
     int32_t backgroundColor_;
     int32_t textColor_;
-    Listeners listeners_;
+    Listeners& listeners_;
     SettingsHolderT& settingsHolder_;
     RectangleDimensions rect_{};
     int currentCorrectAnswer_{};
@@ -784,7 +789,7 @@ MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>
 makeMathsQuiz(TFT_eSPI& tft,
               TftColor backgroundColor,
               TftColor textColor,
-              Listeners listeners,
+              Listeners& listeners,
               SettingsHolderT& settingsHolder)
 {
     return MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>{
@@ -929,8 +934,20 @@ public:
 
     void logAnswer(QuizType quizType, bool correct)
     {
-        auto& record
-            = (quizType == QuizType::Maths) ? mathsRecord_ : spellingRecord_;
+        auto& record = [this, quizType]() -> QuizRecord&
+        {
+            switch (quizType)
+            {
+            case QuizType::Maths:
+                return mathsRecord_;
+            case QuizType::GreekSpelling:
+                return greekRecord_;
+            case QuizType::EnglishSpelling:
+                return englishRecord_;
+            default:
+                return mathsRecord_; // Fallback
+            }
+        }();
         if (correct)
         {
             ++record.correct;
@@ -951,9 +968,14 @@ public:
         return mathsRecord_;
     }
 
-    QuizRecord getSpellingRecord() const
+    QuizRecord getGreekRecord() const
     {
-        return spellingRecord_;
+        return greekRecord_;
+    }
+
+    QuizRecord getEnglishRecord() const
+    {
+        return englishRecord_;
     }
 
     void draw()
@@ -974,7 +996,8 @@ private:
     TFT_eSPI& tft_;
     int score_{0};
     QuizRecord mathsRecord_{};
-    QuizRecord spellingRecord_{};
+    QuizRecord greekRecord_{};
+    QuizRecord englishRecord_{};
     char scoreBuffer_[16] = {'\0'};
 };
 
@@ -2858,12 +2881,13 @@ private:
         tft_.setTextDatum(TL_DATUM);
         tft_.setTextSize(2);
         tft_.setTextPadding(0);
-        char buf[32]              = {'\0'}; // Large enough for large scores
-        const auto fontHeight     = tft_.fontHeight();
-        const auto xOffset        = rect_.x0 + 10;
-        const auto yOffset        = rect_.y0 + 80;
-        const auto mathsRecord    = scoreKeeper_.getMathsRecord();
-        const auto spellingRecord = scoreKeeper_.getSpellingRecord();
+        char buf[32]             = {'\0'}; // Large enough for large scores
+        const auto fontHeight    = tft_.fontHeight();
+        const auto xOffset       = rect_.x0 + 10;
+        const auto yOffset       = rect_.y0 + 80;
+        const auto mathsRecord   = scoreKeeper_.getMathsRecord();
+        const auto greekRecord   = scoreKeeper_.getGreekRecord();
+        const auto englishRecord = scoreKeeper_.getEnglishRecord();
         snprintf(buf,
                  sizeof(buf),
                  "Maths: %d/%d",
@@ -2872,10 +2896,17 @@ private:
         tft_.drawString(buf, xOffset, yOffset, defaultEngFont);
         snprintf(buf,
                  sizeof(buf),
-                 "Spelling: %d/%d",
-                 spellingRecord.correct,
-                 spellingRecord.correct + spellingRecord.wrong);
-        tft_.drawString(buf, xOffset, yOffset + 2 * fontHeight, defaultEngFont);
+                 "GR Spelling: %d/%d",
+                 greekRecord.correct,
+                 greekRecord.correct + greekRecord.wrong);
+        tft_.drawString(
+            buf, xOffset, yOffset + 1.5 * fontHeight, defaultEngFont);
+        snprintf(buf,
+                 sizeof(buf),
+                 "EN Spelling: %d/%d",
+                 englishRecord.correct,
+                 englishRecord.correct + englishRecord.wrong);
+        tft_.drawString(buf, xOffset, yOffset + 3 * fontHeight, defaultEngFont);
     }
 
     void animateScoreCountUp()
@@ -3103,4 +3134,627 @@ makeBatteryIndicator(TFT_eSPI& tft,
 {
     return BatteryIndicator<TFT_eSPI>{
         tft, batteryLevelProvider, backgroundColor};
+}
+
+/* English Spelling quiz */
+
+namespace english
+{
+/// Unstressed endings
+constexpr const char* const suffixes[]
+    = {"tion", "sion", "cian", "ance", "ence", "able", "ible", "ious", "ary",
+       "ery",  "ory",  "ous",  "ant",  "ent",  "ure",  "age",  "ice",  "ise",
+       "ive",  "ine",  "ite",  "ate",  "ar",   "er",   "or",   "ur",   "le",
+       "el",   "al",   "il",   "en",   "on",   "an",   "in",   "un",   "em",
+       "om",   "um",   "am",   "et",   "it",   "ot",   "ut"};
+
+/// Silent letters at the start of a word
+constexpr const char* const initialClusters[]
+    = {"kn", "wr", "gn", "ps", "rh", "wh"};
+
+/// Endings not spelled the way they sound
+constexpr const char* const finalClusters[]
+    = {"stle", "tch", "dge", "mb", "gh", "ck", "lk", "lf"};
+
+/// Anywhere in a word
+constexpr const char* const clusters[] = {"ough",
+                                          "augh",
+                                          "igh",
+                                          "ph",
+                                          "ch",
+                                          "sc",
+                                          "ay",
+                                          "ey",
+                                          "oy",
+                                          "aw",
+                                          "ew",
+                                          "ow",
+                                          "ar",
+                                          "er",
+                                          "ir",
+                                          "or",
+                                          "ur"};
+} // namespace english
+
+constexpr size_t minEnglishWordLength{4};
+constexpr size_t maxEnglishWordLength{15};
+constexpr size_t maxEnglishSentenceLength{35};
+/// Every blank must leave at least this many letters of the word on show
+constexpr size_t minEnglishVisibleLetters{2};
+
+inline bool isEnglishVowel(const char* word, size_t offset)
+{
+    const auto letter = word[offset];
+    if (letter == 'u' && offset > 0 && word[offset - 1] == 'q')
+    {
+        return false; // qu is a consonant cluster, not a vowel
+    }
+    return letter == 'a' || letter == 'e' || letter == 'i' || letter == 'o'
+           || letter == 'u';
+}
+
+inline bool hasPatternAt(const char* word,
+                         size_t length,
+                         size_t offset,
+                         const char* pattern)
+{
+    const auto patternLength = strlen(pattern);
+    return offset + patternLength <= length
+           && memcmp(word + offset, pattern, patternLength) == 0;
+}
+
+/// Length of the longest entry at the offset
+template<size_t Count>
+inline size_t matchLongestPattern(const char* word,
+                                  size_t length,
+                                  size_t offset,
+                                  const char* const (&table)[Count])
+{
+    size_t longest = 0;
+    for (const auto* pattern : table)
+    {
+        const auto patternLength = strlen(pattern);
+        if (patternLength > longest
+            && hasPatternAt(word, length, offset, pattern))
+        {
+            longest = patternLength;
+        }
+    }
+    return longest;
+}
+
+inline bool isSemivowelDigraph(const char* pattern)
+{
+    return pattern[1] == 'y' || pattern[1] == 'w';
+}
+
+inline bool isRControlled(const char* pattern)
+{
+    return pattern[1] == 'r';
+}
+
+/// Length of the cluster sitting at the offset
+inline size_t
+matchEnglishCluster(const char* word, size_t length, size_t offset)
+{
+    if (offset == 0)
+    {
+        const auto initial = matchLongestPattern(
+            word, length, offset, english::initialClusters);
+        if (initial != 0)
+        {
+            return initial;
+        }
+    }
+    for (const auto* pattern : english::finalClusters)
+    {
+        const auto patternLength = strlen(pattern);
+        if (offset + patternLength == length
+            && hasPatternAt(word, length, offset, pattern))
+        {
+            return patternLength;
+        }
+    }
+    size_t longest = 0;
+    for (const auto* pattern : english::clusters)
+    {
+        const auto patternLength = strlen(pattern);
+        if (patternLength <= longest
+            || !hasPatternAt(word, length, offset, pattern))
+        {
+            continue;
+        }
+        const auto after = offset + patternLength;
+        // A digraph ending in y or w only counts when nothing sounded follows
+        if (patternLength == 2 && isSemivowelDigraph(pattern) && after < length
+            && isEnglishVowel(word, after))
+        {
+            continue;
+        }
+        // An r-controlled vowel needs a plain consonant after it, so that bird
+        // counts but the fully sounded a-r-i of arrive does not. A doubled r
+        // (carrot) and a following y (very) are sounded the same way, and an
+        // ending like -ar belongs to the suffix rule instead.
+        if (patternLength == 2 && isRControlled(pattern)
+            && (after == length || word[after] == 'r' || word[after] == 'y'
+                || isEnglishVowel(word, after)))
+        {
+            continue;
+        }
+        if (strcmp(pattern, "sc") == 0 && after < length && word[after] == 'h')
+        {
+            continue; // school is sch, not sc
+        }
+        longest = patternLength;
+    }
+    return longest;
+}
+
+inline bool hasVowelBefore(const char* word, size_t offset)
+{
+    for (size_t i = 0; i < offset; ++i)
+    {
+        if (isEnglishVowel(word, i))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline bool isSilentELe(const char* word, size_t offset, size_t span)
+{
+    return span == 2 && word[offset] == 'l' && word[offset + 1] == 'e'
+           && (offset == 0 || isEnglishVowel(word, offset - 1));
+}
+
+/// Length of the maximal run of vowels at the offset
+inline size_t matchVowelRun(const char* word, size_t length, size_t offset)
+{
+    size_t run = 0;
+    while (offset + run < length && isEnglishVowel(word, offset + run))
+    {
+        ++run;
+    }
+    return run;
+}
+
+struct EnglishSpellingCandidate
+{
+    int byteOffset{0};
+    int byteLength{0};
+};
+
+inline void offerEnglishCandidate(EnglishSpellingCandidate& chosen,
+                                  int& seen,
+                                  size_t length,
+                                  size_t offset,
+                                  size_t span)
+{
+    if (length - span < minEnglishVisibleLetters)
+    {
+        return;
+    }
+    ++seen;
+    // Keep the first spot, then replace the one held with probability 1/seen
+    if (random(seen) != 0)
+    {
+        return;
+    }
+    chosen = EnglishSpellingCandidate{static_cast<int>(offset),
+                                      static_cast<int>(span)};
+}
+
+inline EnglishSpellingCandidate getEnglishSpellingProblem(const char* word)
+{
+    const auto length = strlen(word);
+    if (length < minEnglishWordLength)
+    {
+        return EnglishSpellingCandidate{};
+    }
+
+    EnglishSpellingCandidate chosen{};
+    int seen{0};
+    for (size_t i = 0; i < length; /* advanced below */)
+    {
+        // A suffix only counts when it reaches the end of the word
+        const auto suffix
+            = matchLongestPattern(word, length, i, english::suffixes);
+        if (suffix != 0 && i + suffix == length && hasVowelBefore(word, i)
+            && !isSilentELe(word, i, suffix))
+        {
+            offerEnglishCandidate(chosen, seen, length, i, suffix);
+            i += suffix;
+            continue;
+        }
+        const auto cluster = matchEnglishCluster(word, length, i);
+        if (cluster != 0)
+        {
+            offerEnglishCandidate(chosen, seen, length, i, cluster);
+            i += cluster;
+            continue;
+        }
+        const auto vowels = matchVowelRun(word, length, i);
+        if (vowels != 0)
+        {
+            // A lone vowel is only ever blanked as part of a suffix
+            if (vowels >= 2)
+            {
+                offerEnglishCandidate(chosen, seen, length, i, vowels);
+            }
+            i += vowels;
+            continue;
+        }
+        ++i;
+    }
+    return chosen;
+}
+
+inline char toLowerAscii(char letter)
+{
+    return (letter >= 'A' && letter <= 'Z')
+               ? static_cast<char>(letter - 'A' + 'a')
+               : letter;
+}
+
+/// Where the word starts in the sentence, or -1 if it is not in there.
+/// Case insensitive, since a sentence may well begin with the word.
+inline int findWordInSentence(const char* sentence, const char* word)
+{
+    const auto sentenceLength = static_cast<int>(strlen(sentence));
+    const auto wordLength     = static_cast<int>(strlen(word));
+    for (int start = 0; start + wordLength <= sentenceLength; ++start)
+    {
+        int matched = 0;
+        while (matched < wordLength
+               && toLowerAscii(sentence[start + matched]) == word[matched])
+        {
+            ++matched;
+        }
+        if (matched == wordLength)
+        {
+            return start;
+        }
+    }
+    return -1;
+}
+
+/// EnglishSpellingQuiz
+/// Unlike the Greek quiz there is no homophone group to pick a keyboard from,
+/// since the whole alphabet is on show, so the quiz only needs to know where
+/// the blank is. The blank is put in the example sentence in place, which both
+/// keeps the sentence from spelling the answer out and lets it say which word
+/// is being spelled: an English blank does not preserve how a word sounds the
+/// way a Greek one does, so w_k on its own could be week, weak, walk or work.
+template<typename TFT_eSPI,
+         typename Listeners,
+         typename SettingsHolderT,
+         typename FileReaderT>
+class EnglishSpellingQuiz
+{
+public:
+    EnglishSpellingQuiz(TFT_eSPI& tft,
+                        Listeners& listeners,
+                        SettingsHolderT& settingsHolder,
+                        FileReaderT& fileReader,
+                        TftColor backgroundColor,
+                        TftColor textColor)
+        : tft_{tft}
+        , listeners_{listeners}
+        , settingsHolder_{settingsHolder}
+        , fileReader_{fileReader}
+        , backgroundColor_{makeColor(backgroundColor)}
+        , textColor_{makeColor(textColor)}
+    {
+    }
+
+    void enableQuiz(bool enable)
+    {
+        enabled_ = enable;
+    }
+
+    bool isEnabled() const
+    {
+        return enabled_;
+    }
+
+    void begin(const RectangleDimensions& rect)
+    {
+        rect_ = rect;
+        enableQuiz(true);
+    }
+
+    void drawNewQuestion()
+    {
+        userInput_[0] = '\0';
+        if (!selectValidWordAndProblem())
+        {
+            setFallbackQuestion();
+        }
+        drawSentence();
+    }
+
+    void handleKeyboardPress(char key)
+    {
+        if (!enabled_)
+        {
+            return;
+        }
+        const auto currentLength = strlen(userInput_);
+        if (currentLength + 1 > maxUserInputLength)
+        {
+            return;
+        }
+        userInput_[currentLength]     = key;
+        userInput_[currentLength + 1] = '\0';
+        prepareDisplayedSentence();
+        drawSentence();
+    }
+
+    /// @return true on exit/transition, false otherwise
+    bool handleButtonEvent(ButtonEvent event)
+    {
+        if (!enabled_)
+        {
+            return false;
+        }
+        switch (event)
+        {
+        case ButtonEvent::Left:
+            if (isAnswerCorrect())
+            {
+                if (settingsHolder_.getSound())
+                {
+                    playCorrectSound();
+                }
+                notifyQuizListeners(true);
+                drawNewQuestion();
+            }
+            else
+            {
+                if (settingsHolder_.getSound())
+                {
+                    playWrongSound();
+                }
+                notifyQuizListeners(false);
+                userInput_[0] = '\0';
+                prepareDisplayedSentence();
+                drawSentence();
+            }
+            return false; // Stay in the quiz
+        case ButtonEvent::Middle:
+        {
+            const auto currentLength = strlen(userInput_);
+            if (currentLength == 0)
+            {
+                return false;
+            }
+            userInput_[currentLength - 1] = '\0';
+            prepareDisplayedSentence();
+            drawSentence();
+        }
+            return false;
+        case ButtonEvent::Right:
+            // Exit the quiz and return to the menu
+            enableQuiz(false);
+            return true; // Exit the quiz
+        default:
+            return false;
+        }
+    }
+
+private:
+    TFT_eSPI& tft_;
+    Listeners& listeners_;
+    SettingsHolderT& settingsHolder_;
+    FileReaderT& fileReader_;
+    int32_t backgroundColor_;
+    int32_t textColor_;
+    bool enabled_{false};
+    RectangleDimensions rect_{};
+
+    constexpr static size_t maxUserInputLength{4};
+    constexpr static size_t sentenceLines{2};
+    constexpr static size_t displayedSentenceSize{maxEnglishSentenceLength
+                                                  + maxUserInputLength + 1};
+
+    char currentWord_[maxEnglishWordLength + 1]{'\0'};
+    char currentSentence_[maxEnglishSentenceLength + 1]{'\0'};
+    char displayedSentence_[displayedSentenceSize]{'\0'};
+    char lines_[sentenceLines][displayedSentenceSize]{{'\0'}};
+    char userInput_[maxUserInputLength + 1]{'\0'};
+    EnglishSpellingCandidate currentProblem_{};
+    int sentenceGapOffset_{0};
+
+    bool isAnswerCorrect() const
+    {
+        const auto gapLength = static_cast<size_t>(currentProblem_.byteLength);
+        return strlen(userInput_) == gapLength
+               && memcmp(userInput_,
+                         currentWord_ + currentProblem_.byteOffset,
+                         gapLength)
+                      == 0;
+    }
+
+    bool selectValidWordAndProblem()
+    {
+        for (int attempt = 0; attempt < 100; ++attempt)
+        {
+            const auto line = fileReader_.readRandomLine();
+            if (!line)
+            {
+                continue;
+            }
+            const auto* separator = strchr(line, '\t');
+            if (!separator)
+            {
+                continue; // Malformed line?
+            }
+            const auto wordLength = static_cast<size_t>(separator - line);
+            const auto maxWordLength
+                = static_cast<size_t>(settingsHolder_.getMaxWordLength());
+            if (wordLength < minEnglishWordLength
+                || wordLength > maxEnglishWordLength
+                || wordLength > maxWordLength)
+            {
+                continue;
+            }
+            const auto* sentence = separator + 1;
+            if (strlen(sentence) > maxEnglishSentenceLength)
+            {
+                continue; // Should probably remove from file
+            }
+            for (size_t i = 0; i < wordLength; ++i)
+            {
+                currentWord_[i] = toLowerAscii(line[i]);
+            }
+            currentWord_[wordLength] = '\0';
+
+            const auto problem = getEnglishSpellingProblem(currentWord_);
+            if (problem.byteLength == 0)
+            {
+                continue;
+            }
+            const auto wordStart = findWordInSentence(sentence, currentWord_);
+            if (wordStart < 0)
+            {
+                continue; // Word not found?! Should fix the file...
+            }
+
+            strncpy(currentSentence_, sentence, sizeof(currentSentence_) - 1);
+            currentSentence_[sizeof(currentSentence_) - 1] = '\0';
+            currentProblem_                                = problem;
+            sentenceGapOffset_ = wordStart + problem.byteOffset;
+
+            prepareDisplayedSentence();
+            return true;
+        }
+        return false;
+    }
+
+    void prepareDisplayedSentence()
+    {
+        const auto prefixLength = static_cast<size_t>(sentenceGapOffset_);
+        const auto inputLength  = strlen(userInput_);
+        // The part of the sentence before the gap, unchanged
+        memcpy(displayedSentence_, currentSentence_, prefixLength);
+        // Then the gap, holding what the user has typed so far
+        memcpy(displayedSentence_ + prefixLength, userInput_, inputLength);
+        auto offset = prefixLength + inputLength;
+        // Show a single underscore while nothing has been typed
+        if (inputLength == 0)
+        {
+            displayedSentence_[offset++] = '_';
+        }
+        // Rest of the sentence, unchanged
+        strncpy(displayedSentence_ + offset,
+                currentSentence_ + prefixLength + currentProblem_.byteLength,
+                sizeof(displayedSentence_) - offset - 1);
+        displayedSentence_[sizeof(displayedSentence_) - 1] = '\0';
+    }
+
+    /// Break the sentence into lines at the last space that fits the screen
+    void wrapDisplayedSentence(size_t charactersPerLine)
+    {
+        size_t start      = 0;
+        const auto length = strlen(displayedSentence_);
+        for (size_t line = 0; line < sentenceLines; ++line)
+        {
+            // A single space rather than an empty string, which has no width
+            // for setTextPadding to erase the previous line from
+            lines_[line][0] = ' ';
+            lines_[line][1] = '\0';
+            if (start >= length)
+            {
+                continue;
+            }
+            auto end = start + charactersPerLine;
+            if (end >= length)
+            {
+                end = length;
+            }
+            else
+            {
+                // Walk back to the last space, unless there is none to find
+                auto lastSpace = end;
+                while (lastSpace > start
+                       && displayedSentence_[lastSpace] != ' ')
+                {
+                    --lastSpace;
+                }
+                if (lastSpace > start)
+                {
+                    end = lastSpace;
+                }
+            }
+            memcpy(lines_[line], displayedSentence_ + start, end - start);
+            lines_[line][end - start] = '\0';
+            // Skip the space the line was broken at
+            start = (end < length && displayedSentence_[end] == ' ') ? end + 1
+                                                                     : end;
+        }
+    }
+
+    void drawSentence()
+    {
+        tft_.setTextColor(textColor_, backgroundColor_);
+        tft_.setTextSize(2);
+        tft_.setTextDatum(TC_DATUM);
+        tft_.setTextPadding(rect_.width);
+        const auto characterWidth = tft_.textWidth("A", defaultEngFont);
+        const auto lineHeight     = tft_.fontHeight(defaultEngFont);
+        wrapDisplayedSentence(rect_.width / characterWidth);
+
+        const auto top
+            = rect_.y0 + (rect_.height - lineHeight * sentenceLines) / 2;
+        for (size_t lineIndex = 0; lineIndex < sentenceLines; ++lineIndex)
+        {
+            tft_.drawString(lines_[lineIndex],
+                            rect_.x0 + rect_.width / 2,
+                            top + lineIndex * lineHeight,
+                            defaultEngFont);
+        }
+    }
+
+    void setFallbackQuestion()
+    {
+        strncpy(currentWord_, "breakfast", sizeof(currentWord_) - 1);
+        currentWord_[sizeof(currentWord_) - 1] = '\0';
+        strncpy(currentSentence_,
+                "I ate eggs for breakfast.",
+                sizeof(currentSentence_) - 1);
+        currentSentence_[sizeof(currentSentence_) - 1] = '\0';
+        // The ea of breakfast
+        currentProblem_ = EnglishSpellingCandidate{2, 2};
+        // Where 'breakfast' starts in the sentence, plus 'br'
+        sentenceGapOffset_ = 15 + currentProblem_.byteOffset;
+        prepareDisplayedSentence();
+    }
+
+    void notifyQuizListeners(bool correct)
+    {
+        for (const auto& listener : listeners_.listeners)
+        {
+            listener(correct);
+        }
+    }
+};
+
+template<typename TFT_eSPI,
+         typename Listeners,
+         typename SettingsHolderT,
+         typename FileReaderT>
+EnglishSpellingQuiz<TFT_eSPI, Listeners, SettingsHolderT, FileReaderT>
+makeEnglishSpellingQuiz(TFT_eSPI& tft,
+                        Listeners& listeners,
+                        SettingsHolderT& settingsHolder,
+                        FileReaderT& fileReader,
+                        TftColor backgroundColor,
+                        TftColor textColor)
+{
+    return EnglishSpellingQuiz<TFT_eSPI,
+                               Listeners,
+                               SettingsHolderT,
+                               FileReaderT>{
+        tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
 }
