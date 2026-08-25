@@ -36,9 +36,16 @@ auto mathsQuizListeners = makeQuizListeners(
         }
         scoreKeeper.logAnswer(QuizType::Maths, correct);
     });
+
 SettingsHolder settingsHolder{};
-auto mathsQuiz = makeMathsQuiz(
-    tft, screenBgColor, colors::White, mathsQuizListeners, settingsHolder);
+const auto randomGenerator = [](int min, int max) { return random(min, max); };
+
+auto mathsQuiz             = makeMathsQuiz(tft,
+                               screenBgColor,
+                               colors::White,
+                               mathsQuizListeners,
+                               settingsHolder,
+                               randomGenerator);
 auto mathKeyboardListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
 auto mathKeyboardLabels
@@ -79,13 +86,14 @@ constexpr size_t greekWordBufferSize
     = maxGreekWordLetters * sizeof(uint16_t) + 1
       + 10; // 10 extra bytes for safety in case there's a long word in the
             // file. The +1 is for the null terminator.
-auto greekWordsFileReader
-    = makeFileReader<greekWordBufferSize>("greek_words.txt", SD);
+auto greekWordsFileReader = makeFileReader<greekWordBufferSize>(
+    "greek_words.txt", SD, randomGenerator);
 
 auto greekSpellingQuiz = makeGreekSpellingQuiz(tft,
                                                greekSpellingQuizListeners,
                                                settingsHolder,
                                                greekWordsFileReader,
+                                               randomGenerator,
                                                screenBgColor,
                                                colors::White);
 
@@ -195,12 +203,14 @@ auto englishSpellingQuizListeners = makeQuizListeners(
 
 auto englishWordsFileReader
     = makeFileReader<maxEnglishSentenceLength + maxEnglishWordLength
-                     + 1 /* tab */ + 1 /* null */>("english_words.txt", SD);
+                     + 1 /* tab */ + 1 /* null */>(
+        "english_words.txt", SD, randomGenerator);
 
 auto englishSpellingQuiz = makeEnglishSpellingQuiz(tft,
                                                    englishSpellingQuizListeners,
                                                    settingsHolder,
                                                    englishWordsFileReader,
+                                                   randomGenerator,
                                                    screenBgColor,
                                                    colors::White);
 
@@ -242,7 +252,7 @@ auto settingsMenu       = makeSettingsMenu(tft, settingsEntries, menuColors);
 auto persistentSettings = makePersistentSettings(
     settingsHolder,
     settingsEntries,
-    [](auto path) { return makeFileReader<16>(path, SD); },
+    [](auto path) { return makeFileReader<16>(path, SD, randomGenerator); },
     [](auto path) { return makeFileWriter(path, SD); });
 auto sdCardChecker = makeSdCardChecker(
     makeFileWriter("sd_card_test.txt", SD),
@@ -254,8 +264,9 @@ auto sdCardChecker = makeSdCardChecker(
         tft.unloadFont(); // Just in case
         tft.loadFont("ubuntu-greek-latin-32");
         ScopedGreekFont greekFontQuickUnloader{tft};
-        auto lockFileReader = makeFileReader<16>("lock_settings.txt", SD);
-        auto line           = lockFileReader.readLine();
+        auto lockFileReader
+            = makeFileReader<16>("lock_settings.txt", SD, randomGenerator);
+        auto line = lockFileReader.readLine();
         settingsMenu.lockMenu(line && strcmp(line, "1") == 0);
     },
     [] { SD.end(); });

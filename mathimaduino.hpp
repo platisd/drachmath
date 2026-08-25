@@ -1,9 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
 #include <stdio.h>
-
-// #include "TFT_eSPI.h"
+#include <stdlib.h>
 
 /**
  * @brief Mathimaduino works on a Seeed Wio Terminal and trains kids in maths
@@ -559,6 +557,7 @@ struct MathsQuestion
     int answer{}; // OK to assume integer division for now
 };
 
+using RandomGenerator = long (*)(int min, int max);
 /// The MathsQuiz class is responsible for managing the maths quiz logic, i.e.
 /// generating the (current and next) questions and checking the answers
 template<typename TFT_eSPI, typename Listeners, typename SettingsHolderT>
@@ -569,12 +568,14 @@ public:
               TftColor backgroundColor,
               TftColor textColor,
               Listeners& listeners,
-              SettingsHolderT& settingsHolder)
+              SettingsHolderT& settingsHolder,
+              RandomGenerator randomGen)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
         , listeners_{listeners}
         , settingsHolder_{settingsHolder}
+        , random_{randomGen}
     {
     }
 
@@ -716,6 +717,7 @@ private:
     int32_t textColor_;
     Listeners& listeners_;
     SettingsHolderT& settingsHolder_;
+    RandomGenerator random_;
     RectangleDimensions rect_{};
     int currentCorrectAnswer_{};
     bool enabled_{false};
@@ -744,10 +746,10 @@ private:
     MathsQuestion generateQuestionHelper()
     {
         int maxOperand = settingsHolder_.getMaxOperand();
-        int operand1   = random(minOperand, maxOperand + 1);
-        int operand2   = random(minOperand, maxOperand + 1);
+        int operand1   = random_(minOperand, maxOperand + 1);
+        int operand2   = random_(minOperand, maxOperand + 1);
         char operation
-            = operations[random(0, settingsHolder_.getOperationsCount())];
+            = operations[random_(0, settingsHolder_.getOperationsCount())];
         switch (operation)
         {
         case '+':
@@ -761,7 +763,7 @@ private:
             // Let's make things easier for the kids
             if (operand1 > 10 && operand2 > 10)
             {
-                operand2 = random(minOperand, 11);
+                operand2 = random_(minOperand, 11);
             }
             return MathsQuestion{
                 operand1, operand2, operation, operand1 * operand2};
@@ -790,10 +792,11 @@ makeMathsQuiz(TFT_eSPI& tft,
               TftColor backgroundColor,
               TftColor textColor,
               Listeners& listeners,
-              SettingsHolderT& settingsHolder)
+              SettingsHolderT& settingsHolder,
+              RandomGenerator randomGen)
 {
     return MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>{
-        tft, backgroundColor, textColor, listeners, settingsHolder};
+        tft, backgroundColor, textColor, listeners, settingsHolder, randomGen};
 }
 
 template<typename TFT_eSPI>
@@ -1826,9 +1829,10 @@ class FileReader
     static_assert(BufferSize >= 2, "Need room for a character and a NULL");
 
 public:
-    FileReader(const char* filename, FileSystem& fs)
+    FileReader(const char* filename, FileSystem& fs, RandomGenerator randomGen)
         : filename_{filename}
         , fs_{fs}
+        , random_{randomGen}
     {
     }
 
@@ -1874,7 +1878,7 @@ public:
         const auto fileSize = file.size();
         for (int attempt = 0; attempt < 3; ++attempt)
         {
-            const auto randomOffset = random(fileSize);
+            const auto randomOffset = random_(0, fileSize);
             file.seek(randomOffset);
             if (randomOffset != 0)
             {
@@ -1894,6 +1898,7 @@ public:
 private:
     const char* filename_;
     FileSystem& fs_;
+    RandomGenerator random_;
     char buffer_[BufferSize]{'\0'};
 
     template<typename FileT>
@@ -1923,10 +1928,10 @@ private:
 };
 
 template<size_t BufferSize, typename FileSystem>
-FileReader<FileSystem, BufferSize> makeFileReader(const char* filename,
-                                                  FileSystem& fs)
+FileReader<FileSystem, BufferSize>
+makeFileReader(const char* filename, FileSystem& fs, RandomGenerator randomGen)
 {
-    return FileReader<FileSystem, BufferSize>{filename, fs};
+    return FileReader<FileSystem, BufferSize>{filename, fs, randomGen};
 }
 
 template<typename SettingsHolderT,
@@ -2423,13 +2428,14 @@ inline void offerSpellingCandidate(GreekSpellingProblems& problems,
                                    int (&seen)[greekSpellingProblemTypeCount],
                                    GreekSpellingProblemType type,
                                    const GreekChar* letters,
+                                   RandomGenerator randomGen,
                                    size_t index,
                                    int letterCount)
 {
     const auto slot = toIndex(type);
     ++seen[slot];
     // Keep the first spot, then replace the one held with probability 1/seen
-    if (random(seen[slot]) != 0)
+    if (randomGen(0, seen[slot]) != 0)
     {
         return;
     }
@@ -2445,7 +2451,8 @@ inline void offerSpellingCandidate(GreekSpellingProblems& problems,
 }
 
 /// Return the problems that can be generated from the word.
-inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
+inline GreekSpellingProblems getGreekSpellingProblems(const char* word,
+                                                      RandomGenerator randomGen)
 {
     GreekChar letters[maxGreekWordLetters];
     const auto count = decodeGreekWord(word, letters);
@@ -2479,6 +2486,7 @@ inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
                                        seen,
                                        GreekSpellingProblemType::Diphthong,
                                        letters,
+                                       randomGen,
                                        i,
                                        2);
             }
@@ -2490,14 +2498,20 @@ inline GreekSpellingProblems getGreekSpellingProblems(const char* word)
                                    seen,
                                    GreekSpellingProblemType::Digraph,
                                    letters,
+                                   randomGen,
                                    i,
                                    2);
             i += 2;
         }
         else if (isAmbiguousVowel(letters[i]))
         {
-            offerSpellingCandidate(
-                problems, seen, GreekSpellingProblemType::Vowel, letters, i, 1);
+            offerSpellingCandidate(problems,
+                                   seen,
+                                   GreekSpellingProblemType::Vowel,
+                                   letters,
+                                   randomGen,
+                                   i,
+                                   1);
             ++i;
         }
         else
@@ -2522,12 +2536,14 @@ public:
                       Listeners& listeners,
                       SettingsHolderT& settingsHolder,
                       FileReaderT& fileReader,
+                      RandomGenerator randomGen,
                       TftColor backgroundColor,
                       TftColor textColor)
         : tft_{tft}
         , listeners_{listeners}
         , settingsHolder_{settingsHolder}
         , fileReader_{fileReader}
+        , random_{randomGen}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
     {
@@ -2662,6 +2678,7 @@ private:
     Listeners& listeners_;
     SettingsHolderT& settingsHolder_;
     FileReaderT& fileReader_;
+    RandomGenerator random_;
     KeyboardDrawer drawAppropriateKeyboard_{nullptr};
     int32_t backgroundColor_;
     int32_t textColor_;
@@ -2701,7 +2718,7 @@ private:
             {
                 continue;
             }
-            const auto problems = getGreekSpellingProblems(word);
+            const auto problems = getGreekSpellingProblems(word, random_);
             if (problems.available == 0)
             {
                 continue;
@@ -2725,7 +2742,7 @@ private:
         GreekSpellingProblemType chosenType{GreekSpellingProblemType::None};
         while (chosenType == GreekSpellingProblemType::None)
         {
-            const auto randomIndex = random(greekSpellingProblemTypeCount);
+            const auto randomIndex = random_(0, greekSpellingProblemTypeCount);
             const auto type
                 = static_cast<GreekSpellingProblemType>(randomIndex + 1);
             if (problems.has(type))
@@ -2800,11 +2817,18 @@ makeGreekSpellingQuiz(TFT_eSPI& tft,
                       Listeners& listeners,
                       SettingsHolderT& settingsHolder,
                       FileReaderT& fileReader,
+                      RandomGenerator randomGen,
                       TftColor backgroundColor,
                       TftColor textColor)
 {
     return GreekSpellingQuiz<TFT_eSPI, Listeners, SettingsHolderT, FileReaderT>{
-        tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
+        tft,
+        listeners,
+        settingsHolder,
+        fileReader,
+        randomGen,
+        backgroundColor,
+        textColor};
 }
 
 template<typename TFT_eSPI, typename ScoreKeeperT, typename SettingsHolderT>
@@ -3343,6 +3367,7 @@ struct EnglishSpellingCandidate
 
 inline void offerEnglishCandidate(EnglishSpellingCandidate& chosen,
                                   int& seen,
+                                  RandomGenerator randomGen,
                                   size_t length,
                                   size_t offset,
                                   size_t span)
@@ -3353,7 +3378,7 @@ inline void offerEnglishCandidate(EnglishSpellingCandidate& chosen,
     }
     ++seen;
     // Keep the first spot, then replace the one held with probability 1/seen
-    if (random(seen) != 0)
+    if (randomGen(0, seen) != 0)
     {
         return;
     }
@@ -3361,7 +3386,8 @@ inline void offerEnglishCandidate(EnglishSpellingCandidate& chosen,
                                       static_cast<int>(span)};
 }
 
-inline EnglishSpellingCandidate getEnglishSpellingProblem(const char* word)
+inline EnglishSpellingCandidate
+getEnglishSpellingProblem(const char* word, RandomGenerator randomGen)
 {
     const auto length = strlen(word);
     if (length < minEnglishWordLength)
@@ -3379,14 +3405,14 @@ inline EnglishSpellingCandidate getEnglishSpellingProblem(const char* word)
         if (suffix != 0 && i + suffix == length && hasVowelBefore(word, i)
             && !isSilentELe(word, i, suffix))
         {
-            offerEnglishCandidate(chosen, seen, length, i, suffix);
+            offerEnglishCandidate(chosen, seen, randomGen, length, i, suffix);
             i += suffix;
             continue;
         }
         const auto cluster = matchEnglishCluster(word, length, i);
         if (cluster != 0)
         {
-            offerEnglishCandidate(chosen, seen, length, i, cluster);
+            offerEnglishCandidate(chosen, seen, randomGen, length, i, cluster);
             i += cluster;
             continue;
         }
@@ -3396,7 +3422,8 @@ inline EnglishSpellingCandidate getEnglishSpellingProblem(const char* word)
             // A lone vowel is only ever blanked as part of a suffix
             if (vowels >= 2)
             {
-                offerEnglishCandidate(chosen, seen, length, i, vowels);
+                offerEnglishCandidate(
+                    chosen, seen, randomGen, length, i, vowels);
             }
             i += vowels;
             continue;
@@ -3453,12 +3480,14 @@ public:
                         Listeners& listeners,
                         SettingsHolderT& settingsHolder,
                         FileReaderT& fileReader,
+                        RandomGenerator randomGen,
                         TftColor backgroundColor,
                         TftColor textColor)
         : tft_{tft}
         , listeners_{listeners}
         , settingsHolder_{settingsHolder}
         , fileReader_{fileReader}
+        , random_{randomGen}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
     {
@@ -3564,6 +3593,7 @@ private:
     Listeners& listeners_;
     SettingsHolderT& settingsHolder_;
     FileReaderT& fileReader_;
+    RandomGenerator random_;
     int32_t backgroundColor_;
     int32_t textColor_;
     bool enabled_{false};
@@ -3626,7 +3656,8 @@ private:
             }
             currentWord_[wordLength] = '\0';
 
-            const auto problem = getEnglishSpellingProblem(currentWord_);
+            const auto problem
+                = getEnglishSpellingProblem(currentWord_, random_);
             if (problem.byteLength == 0)
             {
                 continue;
@@ -3765,12 +3796,18 @@ makeEnglishSpellingQuiz(TFT_eSPI& tft,
                         Listeners& listeners,
                         SettingsHolderT& settingsHolder,
                         FileReaderT& fileReader,
+                        RandomGenerator randomGen,
                         TftColor backgroundColor,
                         TftColor textColor)
 {
     return EnglishSpellingQuiz<TFT_eSPI,
                                Listeners,
                                SettingsHolderT,
-                               FileReaderT>{
-        tft, listeners, settingsHolder, fileReader, backgroundColor, textColor};
+                               FileReaderT>{tft,
+                                            listeners,
+                                            settingsHolder,
+                                            fileReader,
+                                            randomGen,
+                                            backgroundColor,
+                                            textColor};
 }
