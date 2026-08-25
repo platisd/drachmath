@@ -565,11 +565,11 @@ class MathsQuiz
 {
 public:
     MathsQuiz(TFT_eSPI& tft,
-              TftColor backgroundColor,
-              TftColor textColor,
               Listeners& listeners,
               SettingsHolderT& settingsHolder,
-              RandomGenerator randomGen)
+              RandomGenerator randomGen,
+              TftColor backgroundColor,
+              TftColor textColor)
         : tft_{tft}
         , backgroundColor_{makeColor(backgroundColor)}
         , textColor_{makeColor(textColor)}
@@ -789,14 +789,20 @@ private:
 template<typename TFT_eSPI, typename Listeners, typename SettingsHolderT>
 MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>
 makeMathsQuiz(TFT_eSPI& tft,
-              TftColor backgroundColor,
-              TftColor textColor,
               Listeners& listeners,
               SettingsHolderT& settingsHolder,
-              RandomGenerator randomGen)
+              RandomGenerator randomGen,
+              TftColor backgroundColor,
+              TftColor textColor)
 {
     return MathsQuiz<TFT_eSPI, Listeners, SettingsHolderT>{
-        tft, backgroundColor, textColor, listeners, settingsHolder, randomGen};
+        tft,
+        listeners,
+        settingsHolder,
+        randomGen,
+        backgroundColor,
+        textColor,
+    };
 }
 
 template<typename TFT_eSPI>

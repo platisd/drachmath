@@ -41,11 +41,11 @@ SettingsHolder settingsHolder{};
 const auto randomGenerator = [](int min, int max) { return random(min, max); };
 
 auto mathsQuiz             = makeMathsQuiz(tft,
-                               screenBgColor,
-                               colors::White,
                                mathsQuizListeners,
                                settingsHolder,
-                               randomGenerator);
+                               randomGenerator,
+                               screenBgColor,
+                               colors::White);
 auto mathKeyboardListeners = makeKeyboardListeners(
     [](char key) { mathsQuiz.handleKeyboardPress(key); });
 auto mathKeyboardLabels
