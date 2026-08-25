@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 /**
- * @brief Mathimaduino works on a Seeed Wio Terminal and trains kids in maths
+ * @brief Drachmath works on a Seeed Wio Terminal and trains kids in maths
  * and spelling. The idea is that for every correct answer, the child gets
  * pocket money.
  */
