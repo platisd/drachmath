@@ -14,13 +14,15 @@ void warnNoSdCard(int x0,
                   int y0,
                   int textSize,
                   int alignment,
+                  const char* message,
                   TftColor textColor,
                   TftColor backgroundColor)
 {
     tft.setTextColor(makeColor(textColor), makeColor(backgroundColor));
     tft.setTextSize(textSize);
     tft.setTextDatum(alignment);
-    tft.drawString("No SD card: Will lose settings on power off", x0, y0);
+    tft.setTextPadding(0);
+    tft.drawString(message, x0, y0, defaultEngFont);
 }
 
 const TftColor screenBgColor = colors::Teal;
@@ -151,39 +153,6 @@ auto gammaKeyboard       = makeKeyboard<1, 2>(
 RectangleDimensions keyboardAtBottom{};
 RectangleDimensions quizAboveKeyboardInTheMiddle{};
 
-const auto drawGreekKeyboard = [](GreekHomophoneGroup group)
-{
-    const auto beginAndDrawKeyboard = [](auto& keyboard)
-    {
-        keyboard.begin(keyboardAtBottom);
-        keyboard.draw();
-    };
-    // Disable all keyboards first to avoid any overlap
-    epsilonKeyboard.enableKeyboard(false);
-    iotaKeyboard.enableKeyboard(false);
-    omicronKeyboard.enableKeyboard(false);
-    avKeyboard.enableKeyboard(false);
-    evKeyboard.enableKeyboard(false);
-    gammaKeyboard.enableKeyboard(false);
-    switch (group)
-    {
-    case GreekHomophoneGroup::EpsilonSound:
-        return beginAndDrawKeyboard(epsilonKeyboard);
-    case GreekHomophoneGroup::IotaSound:
-        return beginAndDrawKeyboard(iotaKeyboard);
-    case GreekHomophoneGroup::OmicronSound:
-        return beginAndDrawKeyboard(omicronKeyboard);
-    case GreekHomophoneGroup::AvSound:
-        return beginAndDrawKeyboard(avKeyboard);
-    case GreekHomophoneGroup::EvSound:
-        return beginAndDrawKeyboard(evKeyboard);
-    case GreekHomophoneGroup::GammaNasal:
-        return beginAndDrawKeyboard(gammaKeyboard);
-    default:
-        return beginAndDrawKeyboard(iotaKeyboard);
-    }
-};
-
 // clang-format off
 auto englishKeyboardLabels = makeKeyLabels('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
                                           'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
@@ -271,6 +240,49 @@ auto sdCardChecker = makeSdCardChecker(
     },
     [] { SD.end(); });
 
+const auto drawGreekKeyboard = [](GreekHomophoneGroup group)
+{
+    const auto beginAndDrawKeyboard = [](auto& keyboard)
+    {
+        keyboard.begin(keyboardAtBottom);
+        keyboard.draw();
+    };
+    if (!sdCardChecker.isSdCardReadyToUse())
+    {
+        warnNoSdCard(tft.width() * 0.5F,
+                     keyboardAtBottom.y0 - tft.fontHeight(defaultEngFont),
+                     1,
+                     TC_DATUM,
+                     "No SD card: Keyboard may not draw properly",
+                     colors::Black,
+                     screenBgColor);
+    }
+    // Disable all keyboards first to avoid any overlap
+    epsilonKeyboard.enableKeyboard(false);
+    iotaKeyboard.enableKeyboard(false);
+    omicronKeyboard.enableKeyboard(false);
+    avKeyboard.enableKeyboard(false);
+    evKeyboard.enableKeyboard(false);
+    gammaKeyboard.enableKeyboard(false);
+    switch (group)
+    {
+    case GreekHomophoneGroup::EpsilonSound:
+        return beginAndDrawKeyboard(epsilonKeyboard);
+    case GreekHomophoneGroup::IotaSound:
+        return beginAndDrawKeyboard(iotaKeyboard);
+    case GreekHomophoneGroup::OmicronSound:
+        return beginAndDrawKeyboard(omicronKeyboard);
+    case GreekHomophoneGroup::AvSound:
+        return beginAndDrawKeyboard(avKeyboard);
+    case GreekHomophoneGroup::EvSound:
+        return beginAndDrawKeyboard(evKeyboard);
+    case GreekHomophoneGroup::GammaNasal:
+        return beginAndDrawKeyboard(gammaKeyboard);
+    default:
+        return beginAndDrawKeyboard(iotaKeyboard);
+    }
+};
+
 auto statsScreen = makeStatsScreen(
     tft, scoreKeeper, settingsHolder, colors::Black, colors::White);
 
@@ -345,6 +357,7 @@ auto mainMenuEntries = makeMenuEntries(
                              tft.height(),
                              1,
                              TC_DATUM,
+                             "No SD card: Will lose settings on power off",
                              colors::Black,
                              screenBgColor);
             }
