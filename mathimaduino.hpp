@@ -1929,16 +1929,21 @@ FileReader<FileSystem, BufferSize> makeFileReader(const char* filename,
     return FileReader<FileSystem, BufferSize>{filename, fs};
 }
 
-template<typename SettingsHolderT, typename FileSystem, typename Settings>
+template<typename SettingsHolderT,
+         typename Settings,
+         typename FileReaderFactory,
+         typename FileWriterFactory>
 class PersistentSettings
 {
 public:
     PersistentSettings(SettingsHolderT& settingsHolder,
-                       FileSystem& fs,
-                       Settings& settings)
+                       Settings& settings,
+                       FileReaderFactory fileReaderFactory,
+                       FileWriterFactory fileWriterFactory)
         : settingsHolder_{settingsHolder}
-        , fs_{fs}
         , settings_{settings}
+        , createFileReader_{fileReaderFactory}
+        , createFileWriter_{fileWriterFactory}
     {
     }
 
@@ -1946,7 +1951,7 @@ public:
     {
         for (auto& entry : settings_.entries)
         {
-            auto writer = makeFileWriter(entry.persistentFilePath, fs_);
+            auto writer = createFileWriter_(entry.persistentFilePath);
             writer.print(entry.config.options[entry.config.currentIndex]);
         }
     }
@@ -1955,7 +1960,7 @@ public:
     {
         for (auto& entry : settings_.entries)
         {
-            auto reader = makeFileReader<16>(entry.persistentFilePath, fs_);
+            auto reader = createFileReader_(entry.persistentFilePath);
             auto value  = reader.readLine();
             if (!value)
             {
@@ -1976,18 +1981,29 @@ public:
 
 private:
     SettingsHolderT& settingsHolder_;
-    FileSystem& fs_;
     Settings& settings_;
+    FileReaderFactory createFileReader_;
+    FileWriterFactory createFileWriter_;
 };
 
-template<typename SettingsHolderT, typename FileSystem, typename Settings>
-PersistentSettings<SettingsHolderT, FileSystem, Settings>
+template<typename SettingsHolderT,
+         typename Settings,
+         typename FileReaderFactory,
+         typename FileWriterFactory>
+PersistentSettings<SettingsHolderT,
+                   Settings,
+                   FileReaderFactory,
+                   FileWriterFactory>
 makePersistentSettings(SettingsHolderT& settingsHolder,
-                       FileSystem& fs,
-                       Settings& settings)
+                       Settings& settings,
+                       FileReaderFactory fileReaderFactory,
+                       FileWriterFactory fileWriterFactory)
 {
-    return PersistentSettings<SettingsHolderT, FileSystem, Settings>{
-        settingsHolder, fs, settings};
+    return PersistentSettings<SettingsHolderT,
+                              Settings,
+                              FileReaderFactory,
+                              FileWriterFactory>{
+        settingsHolder, settings, fileReaderFactory, fileWriterFactory};
 }
 
 /// Returns true if SD card initialized successfully, false otherwise

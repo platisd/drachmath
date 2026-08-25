@@ -238,9 +238,12 @@ auto settingsEntries = makeSettingsEntries(
                   "sound.txt",
                   [](auto v) { settingsHolder.setSound(v); }});
 
-auto settingsMenu = makeSettingsMenu(tft, settingsEntries, menuColors);
-auto persistentSettings
-    = makePersistentSettings(settingsHolder, SD, settingsEntries);
+auto settingsMenu       = makeSettingsMenu(tft, settingsEntries, menuColors);
+auto persistentSettings = makePersistentSettings(
+    settingsHolder,
+    settingsEntries,
+    [](auto path) { return makeFileReader<16>(path, SD); },
+    [](auto path) { return makeFileWriter(path, SD); });
 auto sdCardChecker = makeSdCardChecker(
     makeFileWriter("sd_card_test.txt", SD),
     [] { return SD.begin(SDCARD_SS_PIN, SDCARD_SPI); },
