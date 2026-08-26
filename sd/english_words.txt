@@ -1,0 +1,397 @@
+arrive	They arrived at school at 7 a.m.
+boat	There is a small boat on the lake.
+breakfast	I ate eggs for breakfast.
+duck	People feed ducks at the lake.
+love	I love my family very much.
+week	What are you doing next week?
+approach	The boy approached his school.
+chemical	The scientist mixed the chemicals.
+kill	I killed the fly.
+laboratory	My mother works in a laboratory.
+noise	The crying baby made a loud noise.
+alien	The alien came in peace.
+suppose	I suppose I should go home now.
+adult	My mom and dad are adults.
+age	She died at the age of 80.
+during	Did you sleep during the movie?
+game	Let's play a board game tonight.
+golf	People play golf in nice weather.
+life	My grandfather had a long life.
+kilometer	A marathon is 42.2 kilometers.
+completely	I was completely wrong.
+sport	She loves watching sport on TV.
+totally	I am totally against that.
+divide	We divided the pizza.
+expert	The wizard was an expert at magic.
+lay	Don't lay your socks on the floor.
+peace	A white dove is a symbol of peace.
+protect	Firemen protect us from fires.
+chase	I was chased by a dog.
+grab	I grabbed a pear from the tree.
+single	I have a single key in my hand.
+tear	It is easy to tear paper.
+animal	My favorite animal is the panda.
+bus	My father takes the bus to work.
+cat	This cat is playing with a ball.
+door	Can you close the door, please?
+friend	Brian's friend is very sad.
+horse	I went to a farm and saw a horse.
+leg	She hurt her leg.
+pull	The children pull the rope.
+rabbit	Look at the rabbit in the park.
+school	The students study at school.
+rest	I rested on the couch after work.
+city	Tokyo is a very big city in Japan.
+country	France is a country in Europe.
+glass	Windows are made of glass.
+people	How many people live in China?
+problem	My problem is that I lost my dog.
+think	I think summer is the best season.
+accounting	He works for an accounting firm.
+loan	I got a loan from the bank.
+quarter	He paid a quarter for the candy.
+extremely	I was extremely worried about him.
+fortunate	I was fortunate to get a seat.
+dinner	I had a hamburger for dinner.
+exchange	The men exchange business cards.
+green	I don't like green apples.
+red	Jack is wearing a red shirt.
+cake	What a beautiful birthday cake!
+carrot	I put a carrot in my salad.
+food	Pasta is a famous food in Italy.
+great	It was a great, exciting game!
+glad	I am glad you came to my party.
+speech	She gave a speech to the class.
+destroy	The glass was destroyed.
+goal	Her goal was to become a doctor.
+serve	He served us our drinks quickly.
+vegetable	Carrots are my favorite vegetable.
+war	Many young men died in the war.
+worth	Our house is worth a lot of money.
+nurse	A nurse helped me get better.
+pain	His head was full of pain.
+various	She owned shoes of various styles.
+amaze	The news in the paper amazed Jack.
+charge	The charge for the shirts was $15.
+contact	I contacted Sue about my party.
+occur	When did the thunderstorm occur?
+opposite	The opposite of black is white.
+average	I'm not rich or poor; I'm average.
+personality	John has a bad personality.
+remove	I removed the nail from the board.
+swim	I love to swim in the ocean.
+block	I saw a block of ice on the floor.
+exercise	You should exercise every day.
+guide	We followed a guide at the park.
+smart	Mary is a smart student.
+feature	The cell phone has many features.
+tip	The tip of his pen was very sharp.
+wide	The door was as wide as my arms.
+attract	The magnet attracted the metal.
+react	James reacted badly to the news.
+examine	The doctor examined my eyes today.
+puzzle	The question was a puzzle to him.
+tour	I took a tour of Asia and Europe.
+band	My brother is in a rock band.
+boring	I think the Internet is boring.
+notice	Did you notice the view?
+own	My grandfather owns that house.
+share	Jimmy shared his apple with me.
+stage	A large screen was on the stage.
+within	Within the box, there was a pizza.
+ahead	The blue car drove on ahead of us.
+inside	The inside of the box was empty.
+lift	The man tried to lift the box.
+spill	I spilled the coffee on the table.
+battle	The battle lasted for many days.
+pale	The girl's skin was very pale.
+rough	The rough ground hurt my feet.
+victim	I was a victim of a robbery.
+ancestor	My ancestors came from Germany.
+can	Sad news can make her cry.
+stress	Dan has a lot of stress at work.
+broad	The river is very long and broad.
+edge	He ran to the edge of the cliff.
+against	They both leaned against the wall.
+island	Japan is a group of islands.
+ocean	The ocean can make powerful waves.
+save	I want to help save the world.
+smile	The baby smiled at me.
+step	Be careful where you step.
+taste	The taste of the fruit was sweet.
+declare	I declared my love for him.
+giant	The giant truck got in my way.
+intention	Do you have good intentions?
+trap	We trapped butterflies in a net.
+gentle	He is very gentle with the baby.
+adequate	This is adequate for my needs.
+tiny	A baby's hand is tiny.
+vision	The eye doctor tested my vision.
+boss	My boss is a nice person.
+smooth	The baby's skin felt very smooth.
+process	Making a cake is a long process.
+height	My height is 168 centimeters.
+convince	She convinced me to buy the house.
+priest	The priest taught us about God.
+ball	Seth bought a new soccer ball.
+few	I have only a few coins.
+sell	This man's job is to sell houses.
+strange	They are wearing strange masks.
+they	They are playing a fun game.
+type	Tulips are a type of flower.
+very	An elephant is a very big animal.
+accident	He damaged the car in an accident.
+gravity	There is no gravity in space.
+miner	The miner was looking for gold.
+skip	He skipped work to get more sleep.
+underground	Subway trains travel underground.
+bucket	I filled the bucket with water.
+slip	The man slipped on the wet floor.
+yard	The girls jumped rope in the yard.
+crowd	The crowd waved to the camera.
+short	The days are short in the winter.
+flag	Our country has a beautiful flag.
+beautiful	There was a beautiful sunset.
+cover	The Earth was covered with clouds.
+form	They formed a new government.
+large	I was frightened by a large bird.
+moon	The moon looks beautiful tonight.
+star	The stars come out at night.
+ugly	It was an ugly sight.
+firm	He sleeps better on a firm bed.
+bug	Birds like eating bugs.
+duke	The duke ruled over the land.
+hire	We hired a man to paint our house.
+inn	The visitor got a room at the inn.
+tight	The knots were too tight to untie.
+clay	She made a bowl out of the clay.
+wheel	A car has four wheels.
+wooden	My mother gave me a wooden spoon.
+hole	They made a big hole in the wall.
+acre	They lived on a 150-acre farm.
+core	Earth has a solid inner core.
+distinct	He has a distinct accent.
+iron	The horse had shoes made of iron.
+fake	The model was wearing fake hair.
+hut	We all went into the hut to sleep.
+creature	Those creatures live in Africa.
+curse	The witch cursed the village.
+pirate	Pirates are very scary characters.
+shortly	My workday will end shortly.
+wicked	My boss is a very wicked man.
+horizon	The sun dipped below the horizon.
+restore	Victor restored the old car.
+burst	The bomb burst over the city.
+crawl	The baby crawled across the floor.
+bald	My oldest brother is bald.
+infant	The infant cried all night.
+pat	I patted some lotion onto my face.
+basket	He put the vegetables in a basket.
+cousin	My cousin looks just like me.
+desk	She put the books on her desk.
+host	He was a gracious host.
+modern	The kitchen had a modern look.
+pink	She chose a pink lipstick.
+fasten	Elizabeth fastened her seat belt.
+toss	He tossed a coin into the air.
+inhabit	No one inhabits the ancient city.
+crown	The crown is made of gold.
+fiber	The mat was made from tiny fibers.
+ripe	The cherries were nice and ripe.
+pill	She took a pill for her headache.
+mist	The forest was covered with mist.
+stem	The rose had a long thin stem.
+howl	The wolf howled at the moon.
+vital	The heart is a vital organ.
+cell	A red blood cell carries oxygen.
+male	He was the only male in the store.
+sugar	She added extra sugar to her tea.
+tame	The tame bird rested in his hand.
+desperate	I'm desperate to find a new job.
+brief	The lawyers took a brief break.
+draft	He was writing his first draft.
+hobby	She liked to paint as a hobby.
+jet	Her company owns a private jet.
+poke	I poked my finger on a thumb tack.
+devastate	The entire wall was devastated.
+shove	She shoved him out of the way.
+carbon	Carbon is found in coal.
+emit	This iron emits steam.
+grind	We grind wheat to make flour.
+substance	Arsenic is a poisonous substance.
+exceptional	Holly is an exceptional student.
+academic    He is an academic scholar.
+acceptance	The acceptance of the law was slow.
+cafe	Monica works part-time at a cafe.
+distinctive	Olives have a distinctive flavor.
+traditional	I prefer traditional furniture.
+fighting	Heavy fighting continued for days.
+coconut	A coconut produces a healthy oil.
+powerful	This perfume has a powerful scent.
+starch	Pasta is high in starch.
+excel	Jenny excels at playing the piano.
+job	He now has a high-paying job.
+virtue	My best virtue is forgiveness.
+rack	He stored his tools on a rack.
+tie	The dog is used to being tied up.
+wax	The candles are made of wax.
+revolve	My life revolves around sports.
+survive	She survived a heart attack.
+scope	Modern history has a wide scope.
+minor	This is a minor problem.
+albeit	She was happy, albeit briefly.
+upgrade	He upgraded to a real fancy car.
+technical	Her technical skill was perfect.
+humid	It is very humid inside a sauna.
+steward	The steward is bringing some tea.
+string	I found a large ball of string.
+global	Pollution is a global problem.
+buzz	Seoul buzzes from dawn till dusk.
+armed	The robber was armed with a gun.
+continent	Asia is the largest continent.
+brew	Please brew a fresh pot of coffee.
+zoom	The cars zoomed along the road.
+injure	The car crash injured two people.
+due	The papers were due on the 19th.
+furnace	Mr. Jones came to fix the furnace.
+powerless	I fear my father is powerless now.
+pea	His favorite food was peas.
+mid	Cassandra fell asleep mid-movie.
+bowl	I put the fruit in the fruit bowl.
+machine	The machine was broken.
+progress	There are clear signs of progress.
+sandy	I love walking on a sandy beach.
+cause	Tiredness caused the accident.
+aquatic	The dolphin is an aquatic mammal.
+tomato	I like tomato sandwiches.
+yell	Someone yelled out his name.
+inflate	I helped him inflate the balloons.
+pouch	I keep my money in a small pouch.
+donor	He was proud to be a blood donor.
+kin	His kin were all farmers.
+globe	Water covers most of the globe.
+hum	The man hummed his favorite song.
+orbit	The Moon orbits the Earth.
+mortal	All people are mortal.
+accept	I accept your offer.
+achieve	She achieved her goal.
+adapt	We must adapt quickly.
+admit	He admitted his mistake.
+advice	She gave me good advice.
+afford	I cannot afford it.
+allow	They allow dogs here.
+announce	They announced the winner.
+anxious	He felt anxious before it.
+appear	A rainbow appeared.
+apply	I applied for the job.
+argue	They often argue about money.
+arrange	She arranged the meeting.
+assist	He assisted the old man.
+attempt	She attempted the test.
+avoid	Try to avoid the noise.
+aware	Are you aware of this?
+balance	She lost her balance.
+benefit	Exercise has many benefits.
+blame	Do not blame yourself.
+borrow	Can I borrow your pen?
+breathe	Try to breathe slowly.
+calm	The sea is calm today.
+cancel	They canceled the trip.
+capture	The camera captured it.
+career	She wants a new career.
+certain	I am certain about it.
+challenge	This is a difficult challenge.
+choice	You made the right choice.
+compare	Do not compare yourself.
+complain	He complained about the food.
+complete	Please complete the form.
+concern	Her safety is my concern.
+confirm	Please confirm the date.
+connect	The bridge connects both towns.
+consider	Please consider my idea.
+contain	This box contains toys.
+continue	Please continue reading.
+control	He cannot control his anger.
+create	We can create a new plan.
+decide	I decided to stay home.
+deliver	They deliver food here.
+depend	It depends on the weather.
+describe	Can you describe the man?
+develop	Children develop quickly.
+discover	We discovered a small cave.
+discuss	We discussed the problem.
+distance	The distance is short.
+effort	Your effort was impressive.
+encourage	My parents encourage me.
+enjoy	I enjoy quiet mornings.
+enough	We have enough food.
+escape	The bird escaped the cage.
+essential	Water is essential for life.
+event	The event starts at noon.
+evidence	There is no evidence.
+exact	Give me the exact number.
+exist	Do ghosts really exist?
+expand	The company plans to expand.
+experience	She has great experience.
+explain	Can you explain this rule?
+familiar	His face looks familiar.
+famous	She became famous quickly.
+fear	He has a fear of heights.
+focus	Try to focus on your work.
+frequent	He is a frequent visitor.
+future	We worry about the future.
+gather	People gathered outside.
+generous	She is very generous.
+handle	I can handle this problem.
+happen	What happened yesterday?
+healthy	Fresh fruit is healthy.
+imagine	Imagine living on Mars.
+improve	Practice will improve your skills.
+include	The price includes breakfast.
+increase	Prices continue to increase.
+independent	She is very independent.
+influence	Friends can influence us.
+inform	Please inform your manager.
+instead	We stayed home instead.
+involve	The job involves travel.
+issue	We need to discuss this issue.
+journey	The journey took six hours.
+likely	Rain is likely tomorrow.
+manage	She manages the whole team.
+mention	He mentioned your name.
+method	This method works well.
+necessary	Sleep is necessary for health.
+offer	They offered me a job.
+opinion	What is your opinion?
+ordinary	It was an ordinary day.
+organize	She organized the files.
+patient	Please be patient with me.
+perform	The band performed tonight.
+perhaps	Perhaps we should leave.
+prevent	Exercise can prevent illness.
+private	This is a private room.
+provide	They provide free meals.
+purpose	What is the purpose of this?
+realize	I realized my mistake.
+receive	Did you receive my email?
+reduce	We need to reduce waste.
+refuse	He refused to answer.
+remain	Please remain seated.
+require	This job requires experience.
+respond	She did not respond.
+result	The test result was good.
+reveal	The report revealed the truth.
+risk	There is a serious risk.
+search	I searched for my keys.
+seem	You seem very tired.
+separate	Keep the two bags separate.
+solve	We need to solve this problem.
+specific	Please give a specific example.
+suggest	I suggest taking a break.
+support	Friends support each other.
+treat	They treated me kindly.
+trust	I trust your judgment.
+understand	I understand your concern.
+usual	This is my usual route.
+valuable	Time is very valuable.
+wonder	I wonder what happened.
