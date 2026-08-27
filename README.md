@@ -101,6 +101,7 @@ preprocessing of the word lists.
   - [English word list](sd/english_words.txt)
     - [Anki](https://apps.ankiweb.net/) database dump and LLM generated
   - [Greek font](sd/ubuntu-greek-latin-32.vlw)
+    - Ubuntu font, size 32, converted to .vlw format ([instructions](https://wiki.seeedstudio.com/Wio-Terminal-LCD-Anti-aliased-Fonts/))
 
 ### Hardware
 
