@@ -60,11 +60,31 @@ Settings are saved persistently if a MicroSD card is present.
 The MicroSD card is also required for the spelling quizzes since the word lists and the Greek font are
 stored there.
 
-Navigation is done via Wio Terminal's buttons (3 on top) and the 5-way joystick. There is a battery
-indicator on the top right corner of the screen, under the score label, visible when the device
-is powered up by the Wio Terminal Chassis Battery.
+Wio Terminal has 3 buttons and a 5-way joystick that are used for navigation.
+The buttons allow the user to select the current menu item, go back to the previous menu, confirm
+a solution to a spelling or math problem, as well as delete the letters or numbers they have typed.
+There is a battery indicator on the top right corner of the screen, under the score label,
+visible when the device is powered up by the Wio Terminal Chassis Battery.
 The battery is not required for `drachmath` to work, but if you want to make the device truly portable,
 I highly recommend it.
+
+The most "intricate" part of the code are the spelling quizzes where two different approaches are used due
+to differences between English and Greek.
+In both quizzes, the user is presented a word with some missing letters without it being obvious how many
+letters are missing since this could "spoil" the right answer.<br>
+In Greek, it is straight-forward to generate a list of homophones, i.e. letters or combinations of letters (diphthongs)
+that sound the same. So whenever there is an "i" sound in a word, there's a very specific set of plausible ways
+to spell it. The user is presented with the said set of alternatives and they have to select the correct one.<br>
+On the other hand, in English it is more difficult to generate a list of plausible homophones as solution candidates.
+I could not find a way that does not require preprocessing the word list and can determine plausible alternatives
+on the fly. Additionally, English words that sound almost the same, may have multiple correct spellings, e.g. `meat` and `meet`. Consequently, presenting just the word with some alternatives was not enough.
+Instead, for English, the following choice was made: Present the user with the entire alphabet and the problem/word within a sentence. The right word choice can sometimes still be ambiguous, but it happens less often.<br>
+To summarize, the Greek spelling quiz is more "multiple-choice" oriented. The user is presented with a word that is
+missing one or two letters. Then, there's a keyboard with plausible alternatives for the missing letters.
+The English spelling quiz presents a user with a sentence and a word with missing letters. The user
+has to select the missing letters from a keyboard with the entire alphabet.
+The approach is a bit assymetrical but a good enough compromise to make both quizzes work without requiring intense
+preprocessing of the word lists.
 
 ### Software
 
