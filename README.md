@@ -77,7 +77,9 @@ I highly recommend it.
 - [SparkFun's Fuel Gauge library](https://github.com/sparkfun/SparkFun_BQ27441_Arduino_Library)
 - [sd](sd) directory contents copied to the root of a FAT32-formatted MicroSD card
   - [Greek word list](sd/greek_words.txt)
+    - LLM generated
   - [English word list](sd/english_words.txt)
+    - [Anki](https://apps.ankiweb.net/) database dump and LLM generated
   - [Greek font](sd/ubuntu-greek-latin-32.vlw)
 
 ### Hardware
