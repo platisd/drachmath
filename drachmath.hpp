@@ -2666,12 +2666,6 @@ public:
         }
     }
 
-    GreekHomophoneGroup getCurrentProblemHomophone() const
-    {
-
-        return currentProblem_.group;
-    }
-
     /// Must be called before drawing the first question so that the right
     /// keyboard can be picked based on the homophone group of each question.
     void registerKeyboardDrawer(KeyboardDrawer picker)
