@@ -119,8 +119,12 @@ auto iotaKeyboardLabels = makeKeyLabels(greek::iota,
                                         greek::omicron,
                                         greek::iotaTonos,
                                         greek::etaTonos,
-                                        greek::upsilonTonos);
-auto iotaKeyboard       = makeKeyboard<2, 4>(
+                                        greek::upsilonTonos,
+                                        greek::upsilonDialytika,
+                                        greek::iotaDialytika,
+                                        greek::upsilonDialytikaTonos,
+                                        greek::iotaDialytikaTonos);
+auto iotaKeyboard       = makeKeyboard<2, 6>(
     tft, keyboardColors, iotaKeyboardLabels, greekSpellingKeyboardListeners);
 
 auto omicronKeyboardLabels = makeKeyLabels(

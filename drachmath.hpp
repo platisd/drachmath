@@ -2124,13 +2124,14 @@ makeSdCardChecker(TestFileWriter testFileWriter,
                                          onSdCardRemoved};
 }
 
-constexpr size_t greekSpellingProblemTypeCount{3};
+constexpr size_t greekSpellingProblemTypeCount{4};
 enum class GreekSpellingProblemType : uint8_t
 {
     None,
     Vowel,
     Diphthong,
-    Digraph
+    Digraph,
+    Diairesis
 };
 
 /// The set of letters a blanked spot can plausibly be filled with
@@ -2226,12 +2227,18 @@ inline uint16_t foldGreek(uint16_t codepoint, bool& accented, bool& dialytika)
         accented = true;
         return greek::omega;
     case greek::iotaDialytika:
-    case greek::iotaDialytikaTonos:
         dialytika = true;
         return greek::iota;
+    case greek::iotaDialytikaTonos:
+        dialytika = true;
+        accented  = true;
+        return greek::iota;
     case greek::upsilonDialytika:
+        dialytika = true;
+        return greek::upsilon;
     case greek::upsilonDialytikaTonos:
         dialytika = true;
+        accented  = true;
         return greek::upsilon;
     case greek::finalSigma:
         return greek::sigma;
@@ -2468,15 +2475,19 @@ inline GreekSpellingProblems getGreekSpellingProblems(const char* word,
     int seen[greekSpellingProblemTypeCount]{};
     for (size_t i = 0; i < count; /* advanced below */)
     {
-        // Ignore letters with dialytika, not interesting to worth the effort
         if (letters[i].dialytika)
         {
+            offerSpellingCandidate(problems,
+                                   seen,
+                                   GreekSpellingProblemType::Diairesis,
+                                   letters,
+                                   randomGen,
+                                   i,
+                                   1);
             ++i;
-            continue;
         }
-        // Two-letter patterns consume both letters
-        if (i + 1 < count && !letters[i + 1].dialytika
-            && isOuPair(letters[i], letters[i + 1]))
+        else if (i + 1 < count && !letters[i + 1].dialytika
+                 && isOuPair(letters[i], letters[i + 1]))
         {
             i += 2; // Ignore ου, no homophone and obvious as a vowel pair
         }
