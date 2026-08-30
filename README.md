@@ -2,6 +2,8 @@
 
 Solve. Spell. Reward. 💰
 
+<img src="media/drachmath.jpg" width="40%">
+
 ## What?
 
 Ever heard of drachmas? 🪙<br>
