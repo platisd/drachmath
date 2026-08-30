@@ -86,6 +86,10 @@ has to select the missing letters from a keyboard with the entire alphabet.
 The approach is a bit assymetrical but a good enough compromise to make both quizzes work without requiring intense
 preprocessing of the word lists.
 
+Lock the current settings by placing a file named `lock_settings.txt` in the root directory of the MicroSD card.
+If the first line of the file is `1`, the user will be able to view the settings but not change them.
+This way you can be "sure" your kids are solving problems at the intended difficulty level.
+
 ### Software
 
 - [Arduino IDE](https://www.arduino.cc/en/software) to flash the code
