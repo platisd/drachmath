@@ -623,20 +623,23 @@ public:
         {
             return;
         }
-        size_t currentLength = strlen(questionBuffer_);
-        if (currentLength < questionBufferSize - 1)
+        size_t currentLength  = strlen(questionBuffer_);
+        auto userAnswerLength = currentLength - userAnswerIndex_;
+        if (userAnswerLength >= maxUserAnswerLength
+            || currentLength >= questionBufferSize - 1)
         {
-            questionBuffer_[currentLength]     = key;
-            questionBuffer_[currentLength + 1] = '\0';
-            tft_.setTextColor(textColor_, backgroundColor_);
-            tft_.setTextSize(3);
-            tft_.setTextDatum(MC_DATUM);
-            tft_.setTextPadding(rect_.width);
-            tft_.drawString(questionBuffer_,
-                            rect_.x0 + rect_.width / 2,
-                            rect_.y0 + rect_.height / 5,
-                            defaultEngFont);
+            return;
         }
+        questionBuffer_[currentLength]     = key;
+        questionBuffer_[currentLength + 1] = '\0';
+        tft_.setTextColor(textColor_, backgroundColor_);
+        tft_.setTextSize(3);
+        tft_.setTextDatum(MC_DATUM);
+        tft_.setTextPadding(rect_.width);
+        tft_.drawString(questionBuffer_,
+                        rect_.x0 + rect_.width / 2,
+                        rect_.y0 + rect_.height / 5,
+                        defaultEngFont);
     }
 
     /// @return true on exit/transition, false otherwise
@@ -726,8 +729,9 @@ private:
     constexpr static unsigned long operationsSize = 4;
     const char operations[operationsSize]         = {'+', '-', '*', '/'};
     /// Enough to contain something like "nnn + nnn = nnnnn" + null terminator
-    constexpr static size_t questionBufferSize = 18;
-    char questionBuffer_[questionBufferSize]   = {'\0'};
+    constexpr static size_t maxUserAnswerLength = 5; // 10000 max result value
+    constexpr static size_t questionBufferSize  = 18;
+    char questionBuffer_[questionBufferSize]    = {'\0'};
     size_t userAnswerIndex_{}; // Index of user answer in questionBuffer_
 
     MathsQuestion generateQuestion()
