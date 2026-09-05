@@ -3469,6 +3469,11 @@ inline int findWordInSentence(const char* sentence, const char* word)
         {
             ++matched;
         }
+        // Note: If the problem word happens to be part of another word that
+        // exists in the sentence, like "eat" and "meat" and the sentence is
+        // "Meat is good to eat", then the first match will be the wrong one.
+        // Usually not a problem since the sentences are simple and the words
+        // intricate enough to not be part of another word.
         if (matched == wordLength)
         {
             return start;
