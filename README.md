@@ -23,6 +23,8 @@ but you would first need to make slight modifications to the code.
 
 <img src="media/01-main_menu.jpg" width="16%"> <img src="media/02-maths.jpg" width="16%"> <img src="media/03-greek.jpg" width="16%"> <img src="media/04-english.jpg" width="16%"> <img src="media/05-settings.jpg" width="16%"> <img src="media/06-stats.jpg" width="16%">
 
+Check out a demo video of [drachmath in action](https://youtu.be/Q8_h5ryIrfY).
+
 ## Why?
 
 The inspiration for `drachmath` came from my own experience as a child.
