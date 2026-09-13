@@ -251,6 +251,32 @@ private:
     TFT_eSPI& tft_;
 };
 
+/// TFT_eSPI only counts the height of "d" as the font's max height/ascent.
+/// Taller glyphs (e.g. ΐ) leave traces with drawString().
+/// Find the tallest glyph in the font and adjust the maxAscent accordingly.
+template<typename TFT_eSPI>
+void fixSmoothFontMaxAscent(TFT_eSPI& tft)
+{
+    if (tft.gUnicode == nullptr || tft.gdY == nullptr)
+    {
+        return; // No smooth font loaded
+    }
+    int16_t maxAscent = static_cast<int16_t>(tft.gFont.maxAscent);
+    for (uint16_t i = 0; i < tft.gFont.gCount; i++)
+    {
+        // Control characters and the space carry nonsense metrics
+        const auto unicode = tft.gUnicode[i];
+        const auto isPrintable
+            = (unicode > 0x20 && unicode < 0x7F) || unicode > 0xA0;
+        if (isPrintable && tft.gdY[i] > maxAscent)
+        {
+            maxAscent = tft.gdY[i];
+        }
+    }
+    tft.gFont.yAdvance += maxAscent - tft.gFont.maxAscent;
+    tft.gFont.maxAscent = static_cast<uint16_t>(maxAscent);
+}
+
 template<typename KeyListenerT, typename... Listeners>
 struct KeyboardListeners
 {
